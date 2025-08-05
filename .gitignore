@@ -38,7 +38,6 @@ bower_components/
 /.pnp
 .pnp.js
 .yarn-integrity
-package-lock.json
 
 # Build artifacts
 build/
