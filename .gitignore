@@ -1,0 +1,89 @@
+# ==================== #
+#  General Exclusions  #
+# ==================== #
+# OS/Editor files
+.DS_Store
+*.swp
+*.swo
+._*
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+*.pid
+*.seed
+*.pid.lock
+
+# Dependencies
+node_modules/
+jspm_packages/
+/.pnp
+.pnp.js
+.yarn-integrity
+
+# Build artifacts
+build/
+dist/
+.next/
+.nuxt/
+.out/
+.serverless/
+.history/
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+!.env.example
+
+# ==================== #
+#  Amplify-Specific    #
+# ==================== #
+# Sensitive Amplify files
+amplify/team-provider-info.json
+amplify/.config/local-*
+amplify/\#current-cloud-backend*
+amplify/backend/amplify-meta.json
+
+# Auto-generated configs
+aws-exports.js
+awsconfiguration.json
+amplifyconfiguration.json
+amplify-build-config.json
+amplify-gradle-config.json
+amplifytools.xcconfig
+amplify_outputs.json
+
+# Temporary files
+amplify/logs/
+amplify/mock-data/
+amplify/mock-api-resources/
+amplify/backend/.temp/
+amplify/backend/awscloudformation/
+amplify/backend/amplify-build/
+
+# Generated code
+src/graphql/
+src/ui-components/
+src/api/
+amplify/backend/api/
+
+# IDE/Editor specific
+.idea/
+.vscode/
+*.sw*
+*.code-workspace
+
+# ==================== #
+#  Testing/Coverage    #
+# ==================== #
+coverage/
+.nyc_output/
+*.lcov
+*.coverage
