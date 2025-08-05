@@ -1,29 +1,44 @@
 # ==================== #
 #  General Exclusions  #
 # ==================== #
+
 # OS/Editor files
 .DS_Store
-*.swp
-*.swo
 ._*
 Thumbs.db
+*.swp
+*.swo
+*.sw*
+*.code-workspace
 
-# Logs
+# IDE/Editor specific
+.idea/
+.vscode/
+
+# Logs and diagnostics
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+logs/
+.DS_Store
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
 *.pid
 *.seed
 *.pid.lock
+pids/
 
 # Dependencies
 node_modules/
 jspm_packages/
+bower_components/
 /.pnp
 .pnp.js
 .yarn-integrity
+package-lock.json
 
 # Build artifacts
 build/
@@ -33,18 +48,44 @@ dist/
 .out/
 .serverless/
 .history/
+.fusebox/
+build/Release
+
+# Cache files
+.cache/
+.npm
+.eslintcache
+*.tsbuildinfo
+.grunt
+.lock-wscript
+.node_repl_history
+
+# TypeScript
+typings/
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Packages
+*.tgz
 
 # Environment files
 .env
-.env.local
-.env.development
-.env.test
-.env.production
+.env.*
 !.env.example
+
+# Testing/Coverage
+coverage/
+.nyc_output/
+*.lcov
+*.coverage
+lib-cov/
 
 # ==================== #
 #  Amplify-Specific    #
 # ==================== #
+
 # Sensitive Amplify files
 amplify/team-provider-info.json
 amplify/.config/local-*
@@ -74,16 +115,8 @@ src/ui-components/
 src/api/
 amplify/backend/api/
 
-# IDE/Editor specific
-.idea/
-.vscode/
-*.sw*
-*.code-workspace
+# DynamoDB Local files
+.dynamodb/
 
-# ==================== #
-#  Testing/Coverage    #
-# ==================== #
-coverage/
-.nyc_output/
-*.lcov
-*.coverage
+# TernJS port file
+.tern-port
