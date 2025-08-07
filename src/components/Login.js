@@ -4,7 +4,7 @@ import './Login.css';
 
 const Login = () => {
   const [username, setUsername] = useState('yiyanglin0102');
-  const [password, setPassword] = useState('NewPassword123!');
+  const [password, setPassword] = useState('123456');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -17,42 +17,21 @@ const Login = () => {
     setError('');
 
     try {
-      // First validate inputs
-      if (!username.trim() || !password.trim()) {
-        throw new Error('Username and password are required');
-      }
-
       const response = await fetch(API_ENDPOINT, {
         method: 'POST',
-        mode: 'cors', // Explicitly enable CORS
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
         },
         body: JSON.stringify({
-          username: username.trim(),
-          password: password.trim()
+          username: String(username).trim(),
+          password: String(password).trim()
         }),
       });
 
-      // First get the response as text to properly handle errors
-      const responseText = await response.text();
-      
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('Failed to parse JSON:', parseError, 'Response:', responseText);
-        throw new Error('Invalid server response');
-      }
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || data.error || 'Login failed');
-      }
-
-      // Validate the response contains required tokens
-      if (!data.idToken || !data.accessToken) {
-        throw new Error('Authentication tokens missing in response');
+        throw new Error(data.error || 'Login failed');
       }
 
       // Store tokens and redirect on success
@@ -94,7 +73,6 @@ const Login = () => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              disabled={loading}
             />
           </div>
 
@@ -106,16 +84,12 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              disabled={loading}
             />
           </div>
 
           <button type="submit" disabled={loading} className="login-button">
             {loading ? (
-              <>
-                <span className="spinner"></span>
-                <span style={{ marginLeft: '8px' }}>Signing in...</span>
-              </>
+              <span className="spinner"></span>
             ) : (
               'Sign In'
             )}
