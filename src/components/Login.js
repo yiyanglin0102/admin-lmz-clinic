@@ -9,8 +9,8 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const API_BASE = 'https://f5oprozl21.execute-api.ap-southeast-1.amazonaws.com/prod';
-  const API_ENDPOINT = `${API_BASE}/{proxy+}`;
+  // const API_BASE = 'https://f5oprozl21.execute-api.ap-southeast-1.amazonaws.com/prod';
+  // const API_ENDPOINT = `${API_BASE}/{proxy+}`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,44 +18,44 @@ const Login = () => {
     setError('');
 
     try {
-      // Validate inputs
-      if (!username.trim() || !password.trim()) {
-        throw new Error('Username and password are required');
-      }
+      // // Validate inputs
+      // if (!username.trim() || !password.trim()) {
+      //   throw new Error('Username and password are required');
+      // }
 
-      const response = await fetch(API_ENDPOINT.replace('{proxy+}', 'login'), {
-        method: 'POST',
-        mode: 'cors',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          username: username.trim(),
-          password: password.trim()
-        }),
-      });
+      // const response = await fetch(API_ENDPOINT.replace('{proxy+}', 'login'), {
+      //   method: 'POST',
+      //   mode: 'cors',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'Accept': 'application/json',
+      //   },
+      //   body: JSON.stringify({
+      //     username: username.trim(),
+      //     password: password.trim()
+      //   }),
+      // });
 
-      // Handle non-2xx responses
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || 
-          errorData.error || 
-          `Login failed with status ${response.status}`
-        );
-      }
+      // // Handle non-2xx responses
+      // if (!response.ok) {
+      //   const errorData = await response.json().catch(() => ({}));
+      //   throw new Error(
+      //     errorData.message || 
+      //     errorData.error || 
+      //     `Login failed with status ${response.status}`
+      //   );
+      // }
 
-      const data = await response.json();
+      // const data = await response.json();
 
-      // Validate response structure
-      if (!data.idToken || !data.accessToken) {
-        throw new Error('Invalid server response: Missing tokens');
-      }
+      // // Validate response structure
+      // if (!data.idToken || !data.accessToken) {
+      //   throw new Error('Invalid server response: Missing tokens');
+      // }
 
-      // Store tokens and redirect
-      localStorage.setItem('idToken', data.idToken);
-      localStorage.setItem('accessToken', data.accessToken);
+      // // Store tokens and redirect
+      // localStorage.setItem('idToken', data.idToken);
+      // localStorage.setItem('accessToken', data.accessToken);
       navigate('/dashboard');
     } catch (err) {
       setError(err.message);
