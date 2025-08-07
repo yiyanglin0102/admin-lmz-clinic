@@ -9,7 +9,8 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const API_ENDPOINT = 'https://f5oprozl21.execute-api.ap-southeast-1.amazonaws.com/prod/login';
+  const API_BASE = 'https://f5oprozl21.execute-api.ap-southeast-1.amazonaws.com/prod';
+  const API_ENDPOINT = `${API_BASE}/{proxy+}`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,24 +18,42 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await fetch(API_ENDPOINT, {
+      // Validate inputs
+      if (!username.trim() || !password.trim()) {
+        throw new Error('Username and password are required');
+      }
+
+      const response = await fetch(API_ENDPOINT.replace('{proxy+}', 'login'), {
         method: 'POST',
+        mode: 'cors',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
-          username: String(username).trim(),
-          password: String(password).trim()
+          username: username.trim(),
+          password: password.trim()
         }),
       });
 
-      const data = await response.json();
-
+      // Handle non-2xx responses
       if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || 
+          errorData.error || 
+          `Login failed with status ${response.status}`
+        );
       }
 
-      // Store tokens and redirect on success
+      const data = await response.json();
+
+      // Validate response structure
+      if (!data.idToken || !data.accessToken) {
+        throw new Error('Invalid server response: Missing tokens');
+      }
+
+      // Store tokens and redirect
       localStorage.setItem('idToken', data.idToken);
       localStorage.setItem('accessToken', data.accessToken);
       navigate('/dashboard');
@@ -73,6 +92,7 @@ const Login = () => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
 
@@ -84,12 +104,16 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
 
           <button type="submit" disabled={loading} className="login-button">
             {loading ? (
-              <span className="spinner"></span>
+              <>
+                <span className="spinner"></span>
+                <span style={{ marginLeft: '8px' }}>Signing in...</span>
+              </>
             ) : (
               'Sign In'
             )}
