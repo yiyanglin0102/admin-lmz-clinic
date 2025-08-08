@@ -1,193 +1,369 @@
 import React, { useState } from "react";
+import "../styles/Settings.css";
 
-const AdminBackend = () => {
-  const [activeTab, setActiveTab] = useState("account");
+const Settings = () => {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  // Mock device data
-  const devices = [
-    {
-      id: 1,
-      name: "MacBook Pro",
-      browser: "Chrome 138",
-      ip: "203.0.113.45",
-      location: "Taipei, Taiwan",
-      lastActive: "2025-08-08 09:15",
-      current: true,
-    },
-    {
-      id: 2,
-      name: "Windows PC",
-      browser: "Edge 128",
-      ip: "198.51.100.23",
-      location: "New York, USA",
-      lastActive: "2025-08-07 22:43",
-      current: false,
-    },
-  ];
+  const [settings, setSettings] = useState({
+    // Localization
+    language: "en",
+    region: "TW",
+    timeZone: "Asia/Taipei",
+    dateFormat: "YYYY/MM/DD",
+    timeFormat: "24h",
+    numberFormat: "1,234.56",
+    currency: "TWD",
+    theme: "system",
+
+    // Notifications
+    notifEmail: true,
+    notifSMS: false,
+    notifPush: true,
+    notifLoginAlerts: true,
+    notifDigest: "daily",
+
+    // Security
+    autoLogoutMins: 30,
+    ipRestrict: false,
+    ipAllowlist: "",
+    twoFactor: false,
+
+    // Privacy
+    telemetry: false,
+    marketingEmails: false,
+    cookiePref: "balanced",
+  });
+
+  const onChange = (k, v) => setSettings((s) => ({ ...s, [k]: v }));
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(false);
+    // TODO: call your backend to persist settings
+    await new Promise((r) => setTimeout(r, 600));
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      {/* Tabs Navigation */}
-      <div className="flex border-b mb-6">
-        {["account", "devices", "settings"].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 -mb-px border-b-2 font-medium capitalize ${
-              activeTab === tab
-                ? "border-blue-500 text-blue-500"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+    <div className="settings-wrap">
+      <header className="settings-header">
+        <h1 className="settings-title">Settings</h1>
+        <p className="settings-subtitle">
+          Preferences for localization, notifications, security, and privacy.
+        </p>
+      </header>
 
-      {/* Account Tab */}
-      {activeTab === "account" && (
-        <>
-          <section className="bg-white shadow rounded-lg p-5 mb-6">
-            <h2 className="text-lg font-semibold mb-4">Profile Information</h2>
-            <div className="flex items-center space-x-4">
-              <img
-                src="https://via.placeholder.com/80"
-                alt="Profile"
-                className="w-20 h-20 rounded-full border"
+      {/* Localization */}
+      <section className="card">
+        <h2 className="card-title">Localization</h2>
+        <div className="grid-2">
+          <div className="field">
+            <label className="label">Language</label>
+            <select
+              className="select"
+              value={settings.language}
+              onChange={(e) => onChange("language", e.target.value)}
+            >
+              <option value="en">English</option>
+              <option value="zh-TW">中文（繁體）</option>
+              <option value="ja">日本語</option>
+            </select>
+            <p className="hint">Affects UI text and date/number formatting.</p>
+          </div>
+
+          <div className="field">
+            <label className="label">Region</label>
+            <select
+              className="select"
+              value={settings.region}
+              onChange={(e) => onChange("region", e.target.value)}
+            >
+              <option value="TW">Taiwan</option>
+              <option value="US">United States</option>
+              <option value="JP">Japan</option>
+              <option value="GB">United Kingdom</option>
+            </select>
+          </div>
+
+          <div className="field">
+            <label className="label">Time zone</label>
+            <select
+              className="select"
+              value={settings.timeZone}
+              onChange={(e) => onChange("timeZone", e.target.value)}
+            >
+              <option value="Asia/Taipei">GMT+8 Taipei</option>
+              <option value="America/New_York">GMT-5 New York</option>
+              <option value="Europe/London">GMT+0 London</option>
+              <option value="Asia/Tokyo">GMT+9 Tokyo</option>
+            </select>
+          </div>
+
+          <div className="field">
+            <label className="label">Date format</label>
+            <select
+              className="select"
+              value={settings.dateFormat}
+              onChange={(e) => onChange("dateFormat", e.target.value)}
+            >
+              <option value="YYYY/MM/DD">YYYY/MM/DD</option>
+              <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+            </select>
+          </div>
+
+          <div className="field">
+            <label className="label">Time format</label>
+            <div className="radio-row">
+              <label className="radio">
+                <input
+                  type="radio"
+                  name="timeFormat"
+                  checked={settings.timeFormat === "24h"}
+                  onChange={() => onChange("timeFormat", "24h")}
+                />
+                24-hour
+              </label>
+              <label className="radio">
+                <input
+                  type="radio"
+                  name="timeFormat"
+                  checked={settings.timeFormat === "12h"}
+                  onChange={() => onChange("timeFormat", "12h")}
+                />
+                12-hour
+              </label>
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">Number format</label>
+            <select
+              className="select"
+              value={settings.numberFormat}
+              onChange={(e) => onChange("numberFormat", e.target.value)}
+            >
+              <option value="1,234.56">1,234.56</option>
+              <option value="1.234,56">1.234,56</option>
+            </select>
+          </div>
+
+          <div className="field">
+            <label className="label">Currency</label>
+            <select
+              className="select"
+              value={settings.currency}
+              onChange={(e) => onChange("currency", e.target.value)}
+            >
+              <option value="TWD">TWD</option>
+              <option value="USD">USD</option>
+              <option value="JPY">JPY</option>
+              <option value="EUR">EUR</option>
+            </select>
+          </div>
+
+          <div className="field">
+            <label className="label">Theme</label>
+            <div className="radio-row">
+              <label className="radio">
+                <input
+                  type="radio"
+                  name="theme"
+                  checked={settings.theme === "light"}
+                  onChange={() => onChange("theme", "light")}
+                />
+                Light
+              </label>
+              <label className="radio">
+                <input
+                  type="radio"
+                  name="theme"
+                  checked={settings.theme === "dark"}
+                  onChange={() => onChange("theme", "dark")}
+                />
+                Dark
+              </label>
+              <label className="radio">
+                <input
+                  type="radio"
+                  name="theme"
+                  checked={settings.theme === "system"}
+                  onChange={() => onChange("theme", "system")}
+                />
+                System
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Notifications */}
+      <section className="card">
+        <h2 className="card-title">Notifications</h2>
+        <div className="grid-2">
+          <div className="field checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.notifEmail}
+                onChange={(e) => onChange("notifEmail", e.target.checked)}
               />
-              <div>
-                <p><strong>Name:</strong> Yi-Yang Lin</p>
-                <p><strong>Email:</strong> yi.yang@example.com ✅</p>
-                <p><strong>Role:</strong> Super Admin</p>
-                <button className="mt-2 px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
-                  Change Profile Picture
-                </button>
-              </div>
-            </div>
-          </section>
+              Email notifications
+            </label>
+          </div>
+          <div className="field checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.notifSMS}
+                onChange={(e) => onChange("notifSMS", e.target.checked)}
+              />
+              SMS notifications
+            </label>
+          </div>
+          <div className="field checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.notifPush}
+                onChange={(e) => onChange("notifPush", e.target.checked)}
+              />
+              Push notifications
+            </label>
+          </div>
+          <div className="field">
+            <label className="label">Email digest</label>
+            <select
+              className="select"
+              value={settings.notifDigest}
+              onChange={(e) => onChange("notifDigest", e.target.value)}
+            >
+              <option value="off">Off</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </div>
+          <div className="field checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.notifLoginAlerts}
+                onChange={(e) => onChange("notifLoginAlerts", e.target.checked)}
+              />
+              Login alerts for new devices/IP
+            </label>
+          </div>
+        </div>
+      </section>
 
-          <section className="bg-white shadow rounded-lg p-5 mb-6">
-            <h2 className="text-lg font-semibold mb-4">Security Settings</h2>
-            <div className="mb-3">
-              <p><strong>Password:</strong> ●●●●●●●●</p>
-              <button className="text-blue-500 hover:underline">Change Password</button>
-            </div>
-            <div className="mb-3">
-              <p><strong>Two-Factor Authentication:</strong> ❌ Disabled</p>
-              <button className="text-blue-500 hover:underline">Enable 2FA</button>
-            </div>
-            <div>
-              <p><strong>Active Sessions:</strong> 3</p>
-              <button className="text-blue-500 hover:underline">Log Out of All Devices</button>
-            </div>
-          </section>
-        </>
-      )}
-
-      {/* Devices Tab */}
-      {activeTab === "devices" && (
-        <section className="bg-white shadow rounded-lg p-5">
-          <h2 className="text-lg font-semibold mb-4">Devices</h2>
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="p-3">Device</th>
-                <th className="p-3">Browser</th>
-                <th className="p-3">IP Address</th>
-                <th className="p-3">Location</th>
-                <th className="p-3">Last Active</th>
-                <th className="p-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {devices.map((device) => (
-                <tr key={device.id} className="border-b hover:bg-gray-50">
-                  <td className="p-3">
-                    {device.name}{" "}
-                    {device.current && (
-                      <span className="text-green-600 text-sm">(Current)</span>
-                    )}
-                  </td>
-                  <td className="p-3">{device.browser}</td>
-                  <td className="p-3">{device.ip}</td>
-                  <td className="p-3">{device.location}</td>
-                  <td className="p-3">{device.lastActive}</td>
-                  <td className="p-3">
-                    {!device.current && (
-                      <button className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600">
-                        Revoke
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
-
-      {/* Settings Tab */}
-      {activeTab === "settings" && (
-        <section className="bg-white shadow rounded-lg p-5 space-y-6">
-          <h2 className="text-lg font-semibold mb-4">Settings</h2>
-
-          {/* General Preferences */}
-          <div>
-            <h3 className="font-medium mb-2">General Preferences</h3>
-            <div className="mb-3">
-              <label className="block text-sm font-medium">Language</label>
-              <select className="border rounded px-3 py-1 mt-1 w-64">
-                <option>English</option>
-                <option>中文</option>
-                <option>日本語</option>
-              </select>
-            </div>
-            <div className="mb-3">
-              <label className="block text-sm font-medium">Time Zone</label>
-              <select className="border rounded px-3 py-1 mt-1 w-64">
-                <option>GMT+8 Taipei</option>
-                <option>GMT-5 New York</option>
-                <option>GMT+0 London</option>
-              </select>
-            </div>
+      {/* Security */}
+      <section className="card">
+        <h2 className="card-title">Security</h2>
+        <div className="grid-2">
+          <div className="field">
+            <label className="label">Auto-logout (minutes)</label>
+            <input
+              type="number"
+              className="input"
+              min={5}
+              step={5}
+              value={settings.autoLogoutMins}
+              onChange={(e) =>
+                onChange("autoLogoutMins", Number(e.target.value || 0))
+              }
+            />
           </div>
 
-          {/* Notifications */}
-          <div>
-            <h3 className="font-medium mb-2">Notifications</h3>
-            <div className="flex items-center space-x-2">
-              <input type="checkbox" id="emailNotif" defaultChecked />
-              <label htmlFor="emailNotif">Email Notifications</label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <input type="checkbox" id="smsNotif" />
-              <label htmlFor="smsNotif">SMS Notifications</label>
-            </div>
+          <div className="field checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.twoFactor}
+                onChange={(e) => onChange("twoFactor", e.target.checked)}
+              />
+              Require 2FA (TOTP/SMS)
+            </label>
+            <p className="hint">If using Cognito, map this to User Pool MFA.</p>
           </div>
 
-          {/* Security */}
-          <div>
-            <h3 className="font-medium mb-2">Security</h3>
-            <div className="flex items-center space-x-2">
-              <input type="checkbox" id="autoLogout" defaultChecked />
-              <label htmlFor="autoLogout">Auto logout after 30 min inactivity</label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <input type="checkbox" id="ipRestrict" />
-              <label htmlFor="ipRestrict">Restrict login to allowed IPs</label>
-            </div>
+          <div className="field checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.ipRestrict}
+                onChange={(e) => onChange("ipRestrict", e.target.checked)}
+              />
+              Restrict login to allowed IPs
+            </label>
           </div>
 
-          {/* Save Button */}
-          <div>
-            <button className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-              Save Changes
-            </button>
+          <div className="field full">
+            <label className="label">IP allowlist (one per line)</label>
+            <textarea
+              className="textarea"
+              rows={4}
+              placeholder={"203.0.113.0/24\n198.51.100.23"}
+              value={settings.ipAllowlist}
+              onChange={(e) => onChange("ipAllowlist", e.target.value)}
+            />
           </div>
-        </section>
-      )}
+        </div>
+      </section>
+
+      {/* Privacy */}
+      <section className="card">
+        <h2 className="card-title">Privacy</h2>
+        <div className="grid-2">
+          <div className="field checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.telemetry}
+                onChange={(e) => onChange("telemetry", e.target.checked)}
+              />
+              Share anonymous usage analytics
+            </label>
+          </div>
+          <div className="field checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.marketingEmails}
+                onChange={(e) => onChange("marketingEmails", e.target.checked)}
+              />
+              Allow product updates/marketing emails
+            </label>
+          </div>
+          <div className="field">
+            <label className="label">Cookie preference</label>
+            <select
+              className="select"
+              value={settings.cookiePref}
+              onChange={(e) => onChange("cookiePref", e.target.value)}
+            >
+              <option value="minimal">Minimal</option>
+              <option value="balanced">Balanced</option>
+              <option value="full">Full</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="actions">
+        <button className="btn ghost" onClick={() => window.location.reload()}>
+          Reset
+        </button>
+        <button className="btn primary" onClick={save} disabled={saving}>
+          {saving ? "Saving..." : "Save changes"}
+        </button>
+        {saved && <span className="saved-badge">Saved ✓</span>}
+      </footer>
     </div>
   );
 };
 
-export default AdminBackend;
+export default Settings;
