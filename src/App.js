@@ -9,6 +9,7 @@ import Categories from './pages/Categories.js';
 import Customers from './pages/Customers.js';
 import Dishes from './pages/Dishes.js';
 import Settings from './pages/Settings.js';
+import ProductSettings from './pages/ProductSettings.js';
 import Account from './pages/Account.js';
 import Product from './pages/Product.js';
 import MenuOverview from './pages/MenuOverview';
@@ -30,8 +31,9 @@ function App() {
             <Route path="/product/overview" element={<MenuOverview />} />
             <Route path="/product/categories" element={<Categories />} />
             <Route path="/product/dishes" element={<Dishes />} />
-            <Route path="/product/settings" element={<Settings />} />
+            <Route path="/product/settings" element={<ProductSettings />} />
             <Route path="/account" element={<Account />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
 
         </main>
