@@ -7,7 +7,6 @@ import Orders from './pages/Orders.js';
 import Transactions from './pages/Transactions.js';
 import Categories from './pages/Categories.js';
 import Customers from './pages/Customers.js';
-import Dishes from './pages/Dishes.js';
 import Settings from './pages/Settings.js';
 import ProductSettings from './pages/ProductSettings.js';
 import Account from './pages/Account.js';
@@ -15,7 +14,6 @@ import Product from './pages/Product.js';
 import ProductOverview from './pages/ProductOverview.js';
 import IncomeReports from './pages/IncomeReports.js';
 import Discounts from './pages/Discounts.js';
-
 import './styles/App.css';
 
 function App() {
@@ -32,7 +30,7 @@ function App() {
             <Route path="/product" element={<Product />} />
             <Route path="/product/overview" element={<ProductOverview />} />
             <Route path="/product/categories" element={<Categories />} />
-            <Route path="/product/dishes" element={<Dishes />} />
+            <Route path="/product/product" element={<Product />} />
             <Route path="/product/settings" element={<ProductSettings />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/discounts" element={<Discounts />} />

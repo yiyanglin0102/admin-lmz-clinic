@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 
-const Home = () => {
+const Product = () => {
   
   return (
     <div>
@@ -10,4 +10,4 @@ const Home = () => {
   );
 };
 
-export default Home;
+export default Product;

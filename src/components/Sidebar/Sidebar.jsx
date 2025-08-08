@@ -28,7 +28,7 @@ const Sidebar = () => {
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <h3>Dashboard</h3>
+        <h3>LMZ Clinic</h3>
       </div>
 
       <nav className="sidebar-nav">
@@ -39,28 +39,28 @@ const Sidebar = () => {
         </SidebarGroup>
 
         <SidebarGroup title="Product">
-        <div className="nav-group">
-          <div className="product-label" onClick={() => toggleSection('productManagement')}>
-            <span className="nav-icon">📋</span>
-            <span>Product Management</span>
-            {expandedSections.productManagement ? <FiChevronDown /> : <FiChevronRight />}
-          </div>
-          {expandedSections.productManagement && (
-            <div className="subproduct">
-              <NavItem to="/product/overview" icon="📊" label="Product Overview" indent />
-              <NavItem to="/product/editor" icon="✏️" label="Product Editor" indent />
-              <NavItem to="/product/categories" icon="🗂️" label="Categories" indent />
-              <NavItem to="/product/dishes" icon="🍛" label="Dishes" indent />
-              <NavItem to="/product/addons" icon="➕" label="Add-Ons" indent />
-              <NavItem to="/product/preferences" icon="⚙️" label="Preference" indent />
-              <NavItem to="/product/instock" icon="📦" label="In Stock" indent />
-              <NavItem to="/product/printings" icon="🖨️" label="Printings" indent />
-              <NavItem to="/product/settings" icon="🔧" label="Product Settings" indent />
+          <div className="nav-group">
+            <div className="product-label" onClick={() => toggleSection('productManagement')}>
+              <span className="nav-icon">📋</span>
+              <span>Management</span>
+              {expandedSections.productManagement ? <FiChevronDown /> : <FiChevronRight />}
             </div>
-          )}
-        </div>
+            {expandedSections.productManagement && (
+              <div className="subproduct">
+                <NavItem to="/product/overview" icon="📊" label="Overview" indent />
+                <NavItem to="/product/editor" icon="✏️" label="Editor" indent />
+                <NavItem to="/product/categories" icon="🗂️" label="Categories" indent />
+                <NavItem to="/product/product" icon="🍛" label="Product" indent />
+                <NavItem to="/product/addons" icon="➕" label="Add-Ons" indent />
+                <NavItem to="/product/instock" icon="📦" label="In Stock" indent />
+                <NavItem to="/product/printings" icon="🖨️" label="Printings" indent />
+                <NavItem to="/product/preferences" icon="⚙️" label="Preference" indent />
+                <NavItem to="/product/settings" icon="🔧" label="Settings" indent />
+              </div>
+            )}
+          </div>
         </SidebarGroup>
-        
+
         <SidebarGroup title="Financial">
           <NavItem to="/transactions" icon="💳" label="Transactions" />
           <NavItem to="/discounts" icon="🏷️" label="Discounts" />
