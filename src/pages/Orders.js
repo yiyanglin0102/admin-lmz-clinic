@@ -10,7 +10,7 @@ import {
   TableRow,
   Paper,
 } from '@mui/material';
-import { sampleOrdersData } from '../sample_data/sampleOrdersData.js';
+import { sampleOrdersData } from '../sample_data/sample_OrdersData.js';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);

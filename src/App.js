@@ -12,7 +12,10 @@ import Settings from './pages/Settings.js';
 import ProductSettings from './pages/ProductSettings.js';
 import Account from './pages/Account.js';
 import Product from './pages/Product.js';
-import MenuOverview from './pages/MenuOverview';
+import ProductOverview from './pages/ProductOverview.js';
+import IncomeReports from './pages/IncomeReports.js';
+import Discounts from './pages/Discounts.js';
+
 import './styles/App.css';
 
 function App() {
@@ -26,12 +29,14 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/customers" element={<Customers />} />
-            <Route path="/transactions" element={<Transactions />} />
             <Route path="/product" element={<Product />} />
-            <Route path="/product/overview" element={<MenuOverview />} />
+            <Route path="/product/overview" element={<ProductOverview />} />
             <Route path="/product/categories" element={<Categories />} />
             <Route path="/product/dishes" element={<Dishes />} />
             <Route path="/product/settings" element={<ProductSettings />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/discounts" element={<Discounts />} />
+            <Route path="/income-reports" element={<IncomeReports />} />
             <Route path="/account" element={<Account />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

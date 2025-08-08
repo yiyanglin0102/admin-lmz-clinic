@@ -64,7 +64,7 @@ const Sidebar = () => {
         <SidebarGroup title="Financial">
           <NavItem to="/transactions" icon="💳" label="Transactions" />
           <NavItem to="/discounts" icon="🏷️" label="Discounts" />
-          <NavItem to="/income-reports" icon="📈" label="Income Report" />
+          <NavItem to="/income-reports" icon="📈" label="Income Reports" />
         </SidebarGroup>
 
         <SidebarGroup title="System">

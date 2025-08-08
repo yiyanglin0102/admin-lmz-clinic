@@ -8,7 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
-import sampleTransactions from '../sample_data/sampleTransactions';
+import sampleTransactions from '../sample_data/sample_Transactions';
 import customerData from '../sample_data/sample_customers';
 import { ArrowUpward, LocalShipping, ShoppingCart, Payment } from '@mui/icons-material';
 
