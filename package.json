@@ -16,6 +16,8 @@
   "dependencies": {
     "@aws-amplify/core": "^6.13.1",
     "@aws-amplify/ui-react": "^6.11.2",
+    "@aws-sdk/client-s3": "^3.864.0",
+    "@aws-sdk/s3-request-presigner": "^3.864.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.1",

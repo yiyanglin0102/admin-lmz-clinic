@@ -51,8 +51,8 @@ const Sidebar = () => {
                 <NavItem to="/product/editor" icon="✏️" label="Editor" indent />
                 <NavItem to="/product/categories" icon="🗂️" label="Categories" indent />
                 <NavItem to="/product/product" icon="🍛" label="Product" indent />
-                <NavItem to="/product/addons" icon="➕" label="Add-Ons" indent />
-                <NavItem to="/product/instock" icon="📦" label="In Stock" indent />
+                <NavItem to="/product/add-ons" icon="➕" label="Add-Ons" indent />
+                <NavItem to="/product/in-stock" icon="📦" label="In Stock" indent />
                 <NavItem to="/product/printings" icon="🖨️" label="Printings" indent />
                 <NavItem to="/product/preferences" icon="⚙️" label="Preference" indent />
                 <NavItem to="/product/settings" icon="🔧" label="Settings" indent />
