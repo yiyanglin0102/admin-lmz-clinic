@@ -1,26 +1,30 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
+import "../styles/Settings.css";
+import { getSettings, patchSettings } from "../services/settings";
 
-export default function Avatar() {
-  const [src, setSrc] = useState("");
+const Settings = () => {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      const key = "prod/profiles/yiyanglin0102/avatar-1754894072011.jpg";
-      const r = await fetch(
-        "https://3srgkiu0yl.execute-api.ap-southeast-1.amazonaws.com/getViewUrl?key=" +
-        encodeURIComponent(key)
-      );
-      const { url } = await r.json();
-      setSrc(url); // presigned GET
-    }
-    load();
+    (async () => {
+      try {
+        const data = await getSettings();
+        console.log("GET /me/settings response:", data); // 👈 log API result here
+        setSettings(data);
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   return (
-    <img
-      src={src}
-      alt="avatar"
-      style={{ width: 160, height: 160, objectFit: "cover", borderRadius: 12 }}
-    />
+    <div>
+      {loading ? "Loading..." : <pre>{JSON.stringify(settings, null, 2)}</pre>}
+    </div>
   );
-}
+};
+
+export default Settings;

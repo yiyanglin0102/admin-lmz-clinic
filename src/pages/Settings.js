@@ -1,51 +1,52 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../styles/Settings.css";
+import { getSettings, patchSettings } from "../services/settings";
 
 const Settings = () => {
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const [settings, setSettings] = useState({
-    // Localization
-    language: "en",
-    region: "TW",
-    timeZone: "Asia/Taipei",
-    dateFormat: "YYYY/MM/DD",
-    timeFormat: "24h",
-    numberFormat: "1,234.56",
-    currency: "TWD",
-    theme: "system",
+  const [settings, setSettings] = useState(null);
 
-    // Notifications
-    notifEmail: true,
-    notifSMS: false,
-    notifPush: true,
-    notifLoginAlerts: true,
-    notifDigest: "daily",
-
-    // Security
-    autoLogoutMins: 30,
-    ipRestrict: false,
-    ipAllowlist: "",
-    twoFactor: false,
-
-    // Privacy
-    telemetry: false,
-    marketingEmails: false,
-    cookiePref: "balanced",
-  });
+  // Load settings on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getSettings();
+        setSettings(data);
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const onChange = (k, v) => setSettings((s) => ({ ...s, [k]: v }));
 
   const save = async () => {
     setSaving(true);
     setSaved(false);
-    // TODO: call your backend to persist settings
-    await new Promise((r) => setTimeout(r, 600));
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1800);
+    try {
+      await patchSettings(settings);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1800);
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+      alert("Save failed: " + err.message);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return <div className="settings-wrap">Loading settings...</div>;
+  }
+
+  if (!settings) {
+    return <div className="settings-wrap">Failed to load settings.</div>;
+  }
 
   return (
     <div className="settings-wrap">
@@ -352,7 +353,7 @@ const Settings = () => {
         </div>
       </section>
 
-      {/* Footer */}
+     {/* Footer */}
       <footer className="actions">
         <button className="btn ghost" onClick={() => window.location.reload()}>
           Reset
