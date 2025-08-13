@@ -1,7 +1,28 @@
+// src/pages/Account.js
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import "../styles/Account.css";
+import { getProfile, patchProfile, listSessions } from "../services/account";
+import LoginActivity from "../components/LoginActivity";
 
 const API_BASE = "https://3srgkiu0yl.execute-api.ap-southeast-1.amazonaws.com";
+
+// ===== Mock toggle =====
+// Set to true to use local mock sessions (Option B runtime generator).
+const DEV_USE_MOCK_SESSIONS = false;
+
+// Create "now - X minutes" ISO
+function isoAgo(minutes) {
+  return new Date(Date.now() - minutes * 60 * 1000).toISOString();
+}
+
+function createDevSessions() {
+  return [
+    { sessionId: "sess-a1", lastSeenAt: isoAgo(2),   ip: "203.0.113.88", ua: "Mozilla/5.0 ... Chrome/126",  active: true,  city: "Taipei", country: "TW" },
+    { sessionId: "sess-b2", lastSeenAt: isoAgo(20),  ip: "198.51.100.45", ua: "Mozilla/5.0 ... Edg/126",    active: false, city: "New York", country: "US", suspicious: true },
+    { sessionId: "sess-c3", lastSeenAt: isoAgo(120), ip: "192.0.2.77",    ua: "Mozilla/5.0 ... Safari/17",  active: false, city: "Tokyo", country: "JP", revokedAt: new Date(Date.now() - 115*60*1000).toISOString() },
+    { sessionId: "sess-d4", lastSeenAt: isoAgo(4320),ip: "203.0.113.200", ua: "Mozilla/5.0 ... Firefox/125",active: false, city: "San Francisco", country: "US" }
+  ];
+}
 
 function Avatar({ keyPath }) {
   const [src, setSrc] = useState("");
@@ -29,11 +50,7 @@ function Avatar({ keyPath }) {
 
   return (
     <div>
-      {src ? (
-        <img src={src} alt="avatar" className="avatar" />
-      ) : (
-        <div className="avatar placeholder" />
-      )}
+      {src ? <img src={src} alt="avatar" className="avatar" /> : <div className="avatar placeholder" />}
       {err && <div style={{ color: "crimson", marginTop: 6, fontSize: 12 }}>{err}</div>}
     </div>
   );
@@ -47,22 +64,20 @@ const Account = () => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // The current server-side key for this user's avatar (store in DB in real app)
+  const [sessions, setSessions] = useState([]);
+
   const [avatarKey, setAvatarKey] = useState(
     "prod/profiles/yiyanglin0102/avatar-1754894072011.jpg"
   );
 
-  // "Edit" (local) state for choosing a new photo before upload
   const [draftFile, setDraftFile] = useState(null);
   const [draftPreview, setDraftPreview] = useState("");
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef(null);
 
-  // open file dialog
   const pickFile = () => fileInputRef.current?.click();
 
-  // when a file is chosen
   const onPickFile = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -81,7 +96,6 @@ const Account = () => {
     setDraftPreview(url);
   };
 
-  // cancel draft
   const cancelDraft = () => {
     setDraftFile(null);
     if (draftPreview) URL.revokeObjectURL(draftPreview);
@@ -90,13 +104,11 @@ const Account = () => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // upload draft to S3 and set as active avatar
   const confirmUpload = async () => {
     if (!draftFile) return;
     setUploading(true);
     setProgress(0);
     try {
-      // 1) Get pre-signed PUT
       const r1 = await fetch(`${API_BASE}/getUploadUrl`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -104,14 +116,8 @@ const Account = () => {
       });
       const { uploadUrl, key } = await r1.json();
       if (!r1.ok || !uploadUrl) throw new Error("Failed to get upload URL");
-
-      // 2) PUT to S3 with progress reporting
       await putWithProgress(uploadUrl, draftFile, draftFile.type, (p) => setProgress(p));
-
-      // 3) Persist key to your backend user (TODO in real app)
-      setAvatarKey(key); // triggers <Avatar> to reload via /getViewUrl
-
-      // 4) cleanup
+      setAvatarKey(key);
       cancelDraft();
     } catch (err) {
       alert(`Upload error: ${err}`);
@@ -120,7 +126,6 @@ const Account = () => {
     }
   };
 
-  // XHR for progress (fetch doesn't expose upload progress)
   const putWithProgress = (url, file, contentType, onProgress) =>
     new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -139,12 +144,46 @@ const Account = () => {
   const save = async () => {
     setSaving(true);
     setSaved(false);
-    // TODO: send displayName + avatarKey to your backend to persist
+    // TODO: persist displayName + avatarKey
     await new Promise((r) => setTimeout(r, 600));
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
+
+  const changePassword = async () => { console.log("Changing password..."); };
+  const enable2FA      = async () => { console.log("Enabling 2FA..."); };
+  const disable2FA     = async () => { console.log("Disabling 2FA..."); };
+  const logOutAllDevices = async () => { console.log("Logging out from all devices..."); };
+  const editRecoveryEmail = async () => { console.log("Recovering email..."); };
+  const editRecoveryPhone = async () => { console.log("Recovering phone..."); };
+  const deleteAccount = async () => { console.log("Deleting account..."); };
+  const exportAccountData = async () => { console.log("Exporting account data..."); };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (DEV_USE_MOCK_SESSIONS) {
+          setSessions(createDevSessions());
+        } else {
+          const { sessions } = await listSessions();
+          setSessions(sessions || []);
+        }
+      } catch (e) {
+        console.error("Failed to load sessions:", e);
+        setSessions([]);
+      }
+    })();
+  }, []);
+
+  const isActive = (s) => {
+    if (s.revokedAt) return false;
+    if (typeof s.active === "boolean") return s.active;
+    const mins = (Date.now() - new Date(s.lastSeenAt).getTime()) / 60000;
+    return mins <= 5;
+  };
+
+  const activeCount = sessions.filter(isActive).length;
 
   return (
     <div className="account-wrap">
@@ -171,7 +210,6 @@ const Account = () => {
             <p><strong>Email:</strong> yi.yang@example.com <span className="ok">Verified</span></p>
             <p><strong>Role:</strong> Super Admin</p>
 
-            {/* Edit avatar controls */}
             <div className="profile-actions" style={{ gap: 8, display: "flex", alignItems: "center" }}>
               <button className="btn primary" onClick={pickFile}>Change profile picture</button>
               <input
@@ -183,7 +221,6 @@ const Account = () => {
               />
             </div>
 
-            {/* Draft preview + actions */}
             {draftPreview && (
               <div className="draft-wrap">
                 <div className="draft-row">
@@ -218,7 +255,7 @@ const Account = () => {
             <label className="label">Password</label>
             <div className="inline">
               <span>●●●●●●●●</span>
-              <button className="btn ghost sm">Change password</button>
+              <button className="btn ghost sm" onClick={changePassword}>Change password</button>
             </div>
           </div>
 
@@ -226,28 +263,23 @@ const Account = () => {
             <label className="label">Two-Factor Authentication (2FA)</label>
             <div className="inline">
               <span>Disabled</span>
-              <button className="btn ghost sm">Enable 2FA</button>
+              <button className="btn ghost sm" onClick={enable2FA}>Enable 2FA</button>
+              <button className="btn ghost sm" onClick={disable2FA}>Disable 2FA</button>
             </div>
           </div>
 
           <div className="field full">
             <label className="label">Active sessions</label>
             <div className="inline">
-              <span>3 devices signed in</span>
-              <button className="btn ghost sm">Log out of all devices</button>
+              <span>{activeCount} devices signed in</span>
+              <button className="btn ghost sm" onClick={logOutAllDevices}>Log out of all devices</button>
             </div>
           </div>
         </div>
       </section>
 
       {/* Login Activity */}
-      <section className="card">
-        <h2 className="card-title">Login activity</h2>
-        <ul className="activity">
-          <li><span className="dot ok" /> 2025-08-08 09:15 — Chrome — Taipei</li>
-          <li><span className="dot warn" /> 2025-08-07 22:43 — Edge — New York</li>
-        </ul>
-      </section>
+      <LoginActivity sessions={sessions} />
 
       {/* Recovery */}
       <section className="card">
@@ -257,14 +289,14 @@ const Account = () => {
             <label className="label">Recovery email</label>
             <div className="inline">
               <span>recovery@example.com</span>
-              <button className="btn ghost sm">Edit</button>
+              <button className="btn ghost sm" onClick={editRecoveryEmail}>Edit</button>
             </div>
           </div>
           <div className="field">
             <label className="label">Recovery phone</label>
             <div className="inline">
               <span>+886 912 345 678</span>
-              <button className="btn ghost sm">Edit</button>
+              <button className="btn ghost sm" onClick={editRecoveryPhone}>Edit</button>
             </div>
           </div>
         </div>
@@ -278,22 +310,19 @@ const Account = () => {
             <h3>Export account data</h3>
             <p className="hint">Download your account profile and settings.</p>
           </div>
-          <button className="btn ghost">Export</button>
+          <button className="btn ghost" onClick={exportAccountData}>Export</button>
         </div>
         <div className="danger-row">
           <div>
             <h3>Delete account</h3>
             <p className="hint">This action is permanent and cannot be undone.</p>
           </div>
-          <button className="btn danger">Delete</button>
+          <button className="btn danger" onClick={deleteAccount}>Delete</button>
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="actions">
-        <button className="btn ghost" onClick={() => window.location.reload()}>
-          Reset
-        </button>
+        <button className="btn ghost" onClick={() => window.location.reload()}>Reset</button>
         <button className="btn primary" onClick={save} disabled={saving}>
           {saving ? "Saving..." : "Save changes"}
         </button>

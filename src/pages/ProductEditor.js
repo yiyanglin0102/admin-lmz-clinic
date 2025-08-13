@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from "react";
 import "../styles/Settings.css";
 import { getSettings, patchSettings } from "../services/settings";
+import { getProfile, patchProfile, listSessions } from "../services/account";
+
 
 const Settings = () => {
-  const [settings, setSettings] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await getSettings();
-        console.log("GET /me/settings response:", data); // 👈 log API result here
-        setSettings(data);
+        const data = await listSessions();
+        console.log("GET /me/sessions response:", data); // 👈 log API result here
+        setProfile(data);
       } catch (err) {
-        console.error("Failed to load settings:", err);
+        console.error("Failed to load profile:", err);
       } finally {
         setLoading(false);
       }
@@ -22,7 +24,7 @@ const Settings = () => {
 
   return (
     <div>
-      {loading ? "Loading..." : <pre>{JSON.stringify(settings, null, 2)}</pre>}
+      {loading ? "Loading..." : <pre>{JSON.stringify(profile, null, 2)}</pre>}
     </div>
   );
 };
