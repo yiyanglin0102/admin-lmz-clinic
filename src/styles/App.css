@@ -44,3 +44,8 @@
   padding: 20px;
   margin-left: 250px; /* Match Sidebar width */
 }
+
+.app.app--unauthed .sidebar {
+  visibility: hidden;    /* box stays, styles/cascade unchanged */
+  pointer-events: none;
+}

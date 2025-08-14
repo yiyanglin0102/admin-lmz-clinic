@@ -1,57 +1,79 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Sidebar from './components/Sidebar/Sidebar';
-import Login from './components/Login.js';
-import Dashboard from './pages/Dashboard.js';
-import Orders from './pages/Orders.js';
-import Transactions from './pages/Transactions.js';
-import ProductEditor from './pages/ProductEditor.js';
-import ProductCategories from './pages/Categories.js';
-import Customers from './pages/Customers.js';
-import ProductAddOns from './pages/ProductAddOns.js';
-import ProductInStock from './pages/ProductInStock.js';
-import ProductPrintings from './pages/ProductPrintings.js';
-import ProductPreferences from './pages/ProductPreferences.js';
-import Settings from './pages/Settings.js';
-import ProductSettings from './pages/ProductSettings.js';
-import Account from './pages/Account.js';
-import ProductProduct from './pages/ProductProduct.js';
-import ProductOverview from './pages/ProductOverview.js';
-import IncomeReports from './pages/IncomeReports.js';
-import Discounts from './pages/Discounts.js';
-import './styles/App.css';
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "react-oidc-context";
 
-function App() {
+import Sidebar from "./components/Sidebar/Sidebar";
+import Login from "./components/Login";
+import Dashboard from "./pages/Dashboard";
+import Orders from "./pages/Orders";
+import Transactions from "./pages/Transactions";
+import ProductEditor from "./pages/ProductEditor";
+import ProductCategories from "./pages/Categories";
+import Customers from "./pages/Customers";
+import ProductAddOns from "./pages/ProductAddOns";
+import ProductInStock from "./pages/ProductInStock";
+import ProductPrintings from "./pages/ProductPrintings";
+import ProductPreferences from "./pages/ProductPreferences";
+import Settings from "./pages/Settings";
+import ProductSettings from "./pages/ProductSettings";
+import Account from "./pages/Account";
+import ProductProduct from "./pages/ProductProduct";
+import ProductOverview from "./pages/ProductOverview";
+import IncomeReports from "./pages/IncomeReports";
+import Discounts from "./pages/Discounts";
+import OidcCallback from "./pages/OidcCallback";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+
+import "./styles/App.css";
+
+function AppShell() {
+  const auth = useAuth();
+
+  // Keep the DOM identical: always render <Sidebar /> directly under .app
+  // Toggle a modifier class on the root for CSS-only hiding.
+  const appClass = auth.isAuthenticated ? "app" : "app app--unauthed";
+
   return (
-    <Router>
-      <div className="app">
-        <Sidebar />
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Login />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/product/overview" element={<ProductOverview />} />
-            <Route path="/product/editor" element={<ProductEditor />} />
-            <Route path="/product/categories" element={<ProductCategories />} />
-            <Route path="/product/product" element={<ProductProduct />} />
-            <Route path="/product/add-ons" element={<ProductAddOns />} />
-            <Route path="/product/in-stock" element={<ProductInStock />} />
-            <Route path="/product/printings" element={<ProductPrintings />} />
-            <Route path="/product/preferences" element={<ProductPreferences />} />
-            <Route path="/product/settings" element={<ProductSettings />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/discounts" element={<Discounts />} />
-            <Route path="/income-reports" element={<IncomeReports />} />
-            <Route path="/account" element={<Account />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
+    <div className={appClass}>
+      <Sidebar />
 
-        </main>
-      </div>
-    </Router>
+      <main className="main-content">
+        <Routes>
+          {/* Public */}
+          <Route path="/" element={<Login />} />
+          <Route path="/callback" element={<OidcCallback />} />
+
+          {/* Protected */}
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+          <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+          <Route path="/product/overview" element={<ProtectedRoute><ProductOverview /></ProtectedRoute>} />
+          <Route path="/product/editor" element={<ProtectedRoute><ProductEditor /></ProtectedRoute>} />
+          <Route path="/product/categories" element={<ProtectedRoute><ProductCategories /></ProtectedRoute>} />
+          <Route path="/product/product" element={<ProtectedRoute><ProductProduct /></ProtectedRoute>} />
+          <Route path="/product/add-ons" element={<ProtectedRoute><ProductAddOns /></ProtectedRoute>} />
+          <Route path="/product/in-stock" element={<ProtectedRoute><ProductInStock /></ProtectedRoute>} />
+          <Route path="/product/printings" element={<ProtectedRoute><ProductPrintings /></ProtectedRoute>} />
+          <Route path="/product/preferences" element={<ProtectedRoute><ProductPreferences /></ProtectedRoute>} />
+          <Route path="/product/settings" element={<ProtectedRoute><ProductSettings /></ProtectedRoute>} />
+          <Route path="/transactions" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
+          <Route path="/discounts" element={<ProtectedRoute><Discounts /></ProtectedRoute>} />
+          <Route path="/income-reports" element={<ProtectedRoute><IncomeReports /></ProtectedRoute>} />
+          <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+    </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <Router>
+      <AppShell />
+    </Router>
+  );
+}

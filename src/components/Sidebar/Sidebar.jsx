@@ -70,6 +70,7 @@ const Sidebar = () => {
         <SidebarGroup title="System">
           <NavItem to="/account" icon="👤" label="Account" />
           <NavItem to="/settings" icon="⚙️" label="Settings" />
+          <NavItem to="/" icon="🔚" label="Sign Out" />
         </SidebarGroup>
       </nav>
     </div>
