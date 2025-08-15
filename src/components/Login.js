@@ -7,7 +7,7 @@ const Login = () => {
   const auth = useAuth();
 
   const onSignIn = () => auth.signinRedirect();
-  const onSignOut = () => cognitoLogout(); // full Cognito logout
+const onSignOut = () => cognitoLogout(auth);
 
   return (
     <div className="login-container">
