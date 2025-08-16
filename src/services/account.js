@@ -42,11 +42,28 @@ export function patchProfile(partial) {
     return apiFetch("/me/profile", { method: "PATCH", body: partial });
 }
 
-/**
- * GET /me/sessions with a partial object:
- * e.g. listSessions({ userId: "123", status: "online" })
- */
-export function listSessions() {
-    return apiFetch("/me/sessions");
-}
+export async function listSessions() {
+    const res = await fetch(`${API_BASE}/me/sessions`, { credentials: "include" });
+    const data = await res.json();
+    // console.log("listSessions", data);
+    // Accept either { sessions: [...] } or Dynamo-style { Items: [...] }
+    const raw = Array.isArray(data?.sessions)
+        ? data.sessions
+        : Array.isArray(data?.Items)
+            ? data.Items
+            : [];
 
+    const sessions = raw.map((it) => ({
+        sessionId: it.sessionId || it.session_id || it.id || null,
+        lastSeenAt: it.lastSeenAt || it.at || it.timestamp || null,
+        ip: it.ip || it.clientIp || null,
+        ua: it.ua || it.userAgent || "",
+        city: it.city || null,
+        country: it.country || null,
+        revokedAt: it.revokedAt || null,
+        active: typeof it.active === "boolean" ? it.active : undefined,
+        suspicious: Boolean(it.suspicious),
+    }));
+
+    return { sessions };
+}

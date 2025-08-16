@@ -1,35 +1,25 @@
 // src/pages/Account.js
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import "../styles/Account.css";
-import { getProfile, patchProfile, listSessions } from "../services/account";
 import LoginActivity from "../components/LoginActivity";
+import { getProfile, patchProfile, listSessions } from "../services/account";
 
 const API_BASE = "https://3srgkiu0yl.execute-api.ap-southeast-1.amazonaws.com";
 
-// ===== Mock toggle =====
-// Set to true to use local mock sessions (Option B runtime generator).
-const DEV_USE_MOCK_SESSIONS = false;
-
-// Create "now - X minutes" ISO
-function isoAgo(minutes) {
-  return new Date(Date.now() - minutes * 60 * 1000).toISOString();
-}
-
-function createDevSessions() {
-  return [
-    { sessionId: "sess-a1", lastSeenAt: isoAgo(2),   ip: "203.0.113.88", ua: "Mozilla/5.0 ... Chrome/126",  active: true,  city: "Taipei", country: "TW" },
-    { sessionId: "sess-b2", lastSeenAt: isoAgo(20),  ip: "198.51.100.45", ua: "Mozilla/5.0 ... Edg/126",    active: false, city: "New York", country: "US", suspicious: true },
-    { sessionId: "sess-c3", lastSeenAt: isoAgo(120), ip: "192.0.2.77",    ua: "Mozilla/5.0 ... Safari/17",  active: false, city: "Tokyo", country: "JP", revokedAt: new Date(Date.now() - 115*60*1000).toISOString() },
-    { sessionId: "sess-d4", lastSeenAt: isoAgo(4320),ip: "203.0.113.200", ua: "Mozilla/5.0 ... Firefox/125",active: false, city: "San Francisco", country: "US" }
-  ];
-}
-
-function Avatar({ keyPath }) {
+// Avatar now supports srcOverride: if provided, it displays that directly
+function Avatar({ keyPath, srcOverride }) {
   const [src, setSrc] = useState("");
   const [err, setErr] = useState("");
 
   const refresh = useCallback(async () => {
-    if (!keyPath) return;
+    // If an override is provided (blob URL or signed URL), just use it.
+    if (srcOverride) {
+      setErr("");
+      setSrc(srcOverride);
+      return;
+    }
+    // Otherwise fetch via keyPath
+    if (!keyPath) { setSrc(""); return; }
     try {
       setErr("");
       const res = await fetch(
@@ -44,7 +34,7 @@ function Avatar({ keyPath }) {
       setErr(String(e));
       setSrc("");
     }
-  }, [keyPath]);
+  }, [keyPath, srcOverride]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -59,22 +49,65 @@ function Avatar({ keyPath }) {
 const MAX_MB = 8;
 const ACCEPT = "image/png,image/jpeg,image/webp";
 
+/** Canonical UI shape for profile */
+const DEFAULT_PROFILE = {
+  userId: "",
+  email: "",
+  displayName: "",
+  avatarKey: "",
+  createdAt: "",
+  role: "User",
+  twoFactor: false,
+  locale: "zh-TW",
+  timeZone: "Asia/Taipei",
+  region: "TW",
+  currency: "TWD"
+};
+
+/** Map whatever backend returns into the canonical UI shape */
+function normalizeProfile(raw) {
+  const r = raw || {};
+  return {
+    userId: r.userId || r.userID || r.id || "",
+    email: r.email || r.primaryEmail || "",
+    displayName: r.displayName || r.name || "",
+    avatarKey: r.avatarKey || r.avatar || "",
+    createdAt: r.createdAt || r.created_at || r.created || "",
+    role: r.role || r.userRole || "User",
+    twoFactor: Boolean(
+      r.twoFactor ??
+      r.mfaEnabled ??
+      r.totpEnabled ??
+      r.has2FA
+    ),
+    locale: r.locale || r.buyer_locale || r.language || "zh-TW",
+    timeZone: r.timeZone || r.timezone || "Asia/Taipei",
+    region: r.region || "TW",
+    currency: r.currency || r.display_currency || "TWD"
+  };
+}
+
 const Account = () => {
-  const [displayName, setDisplayName] = useState("Yi-Yang Lin");
+  const [displayName, setDisplayName] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const [sessions, setSessions] = useState([]);
 
-  const [avatarKey, setAvatarKey] = useState(
-    "prod/profiles/yiyanglin0102/avatar-1754894072011.jpg"
-  );
-
+  // Draft file BEFORE uploading to S3
   const [draftFile, setDraftFile] = useState(null);
-  const [draftPreview, setDraftPreview] = useState("");
+  const [draftPreview, setDraftPreview] = useState(""); // blob URL from local selection
+
+  // After uploading to S3 (but before save), we hold a PENDING key + preview src
+  const [pendingAvatarKey, setPendingAvatarKey] = useState("");
+  const [pendingAvatarSrc, setPendingAvatarSrc] = useState(""); // signed URL (or we can keep blob)
+
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef(null);
+
+  const [profile, setProfile] = useState(null); // canonical shape
+  const profileLoaded = Boolean(profile);
 
   const pickFile = () => fileInputRef.current?.click();
 
@@ -96,14 +129,30 @@ const Account = () => {
     setDraftPreview(url);
   };
 
-  const cancelDraft = () => {
-    setDraftFile(null);
-    if (draftPreview) URL.revokeObjectURL(draftPreview);
-    setDraftPreview("");
-    setProgress(0);
+  const clearFileInput = () => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const cancelDraft = () => {
+    setDraftFile(null);
+    // Don't revoke if the pending preview is still using this blob
+    if (draftPreview && pendingAvatarSrc !== draftPreview) {
+      URL.revokeObjectURL(draftPreview);
+    }
+    setDraftPreview("");
+    setProgress(0);
+    clearFileInput();
+  };
+
+
+  // Revert the staged avatar change (if user uploaded to S3 but didn't save)
+  const revertPendingPhoto = () => {
+    setPendingAvatarKey("");
+    setPendingAvatarSrc("");
+  };
+
+  // Upload to S3 only; DO NOT write to DB.
+  // After success, keep the S3 key in pending state so Save() can persist later.
   const confirmUpload = async () => {
     if (!draftFile) return;
     setUploading(true);
@@ -115,9 +164,26 @@ const Account = () => {
         body: JSON.stringify({ contentType: draftFile.type })
       });
       const { uploadUrl, key } = await r1.json();
-      if (!r1.ok || !uploadUrl) throw new Error("Failed to get upload URL");
+      if (!r1.ok || !uploadUrl || !key) throw new Error("Failed to get upload URL");
+
       await putWithProgress(uploadUrl, draftFile, draftFile.type, (p) => setProgress(p));
-      setAvatarKey(key);
+
+      // Get a signed view URL for the pending key so preview remains after we close draft
+      try {
+        const v = await fetch(
+          `${API_BASE}/getViewUrl?key=${encodeURIComponent(key)}`,
+          { mode: "cors" }
+        );
+        const data = await v.json();
+        if (!v.ok || !data?.url) throw new Error("Failed to get view URL for pending avatar");
+        setPendingAvatarSrc(data.url);
+      } catch (e) {
+        // Fallback: if we can't fetch a view URL, keep the local blob preview
+        setPendingAvatarSrc(draftPreview);
+      }
+
+      setPendingAvatarKey(key); // <-- staged; not saved yet
+      // Close the draft UI; keep pending states
       cancelDraft();
     } catch (err) {
       alert(`Upload error: ${err}`);
@@ -141,40 +207,87 @@ const Account = () => {
       xhr.send(file);
     });
 
+  // Persist to DB ONLY here
   const save = async () => {
+    if (!profile) return;
     setSaving(true);
     setSaved(false);
-    // TODO: persist displayName + avatarKey
-    await new Promise((r) => setTimeout(r, 600));
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    try {
+      const payload = {
+        displayName,
+        // If a new pending avatar was staged, persist that; otherwise keep current.
+        avatarKey: pendingAvatarKey || profile.avatarKey
+      };
+      const updated = await patchProfile(payload);
+
+      if (updated) {
+        const norm = normalizeProfile(updated);
+        setProfile(norm);
+        setDisplayName(norm.displayName || "");
+      } else {
+        // Merge locally if API doesn't return updated profile
+        setProfile(prev => prev ? {
+          ...prev,
+          displayName,
+          avatarKey: pendingAvatarKey || prev.avatarKey
+        } : prev);
+      }
+
+      // Commit finished — clear pending state
+      setPendingAvatarKey("");
+      setPendingAvatarSrc("");
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      alert(`Save failed: ${e}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const changePassword = async () => { console.log("Changing password..."); };
-  const enable2FA      = async () => { console.log("Enabling 2FA..."); };
-  const disable2FA     = async () => { console.log("Disabling 2FA..."); };
+  const enable2FA = async () => { console.log("Enabling 2FA..."); };
+  const disable2FA = async () => { console.log("Disabling 2FA..."); };
   const logOutAllDevices = async () => { console.log("Logging out from all devices..."); };
   const editRecoveryEmail = async () => { console.log("Recovering email..."); };
   const editRecoveryPhone = async () => { console.log("Recovering phone..."); };
   const deleteAccount = async () => { console.log("Deleting account..."); };
   const exportAccountData = async () => { console.log("Exporting account data..."); };
 
+  // Load profile
   useEffect(() => {
     (async () => {
       try {
-        if (DEV_USE_MOCK_SESSIONS) {
-          setSessions(createDevSessions());
-        } else {
-          const { sessions } = await listSessions();
-          setSessions(sessions || []);
-        }
-      } catch (e) {
-        console.error("Failed to load sessions:", e);
-        setSessions([]);
+        const data = await getProfile();
+        // console.log("GET /me/profile response:", data);
+        const norm = normalizeProfile(data);
+        setProfile(norm);
+        setDisplayName(norm.displayName || "");
+      } catch (err) {
+        console.error("Failed to load profile:", err);
+        setProfile({ ...DEFAULT_PROFILE });
       }
     })();
   }, []);
+  // Load sessions once (supports optional DEV mock)
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const resp = await listSessions();
+        const items = Array.isArray(resp?.sessions) ? resp.sessions : [];
+        if (!cancelled) setSessions(items);
+      } catch (e) {
+        console.error("Failed to load sessions:", e);
+        if (!cancelled) setSessions([]);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
 
   const isActive = (s) => {
     if (s.revokedAt) return false;
@@ -185,6 +298,12 @@ const Account = () => {
 
   const activeCount = sessions.filter(isActive).length;
 
+  // Decide what to display in the avatar slot:
+  // - If user picked a file but hasn't uploaded to S3 yet -> draftPreview (blob)
+  // - Else if we uploaded to S3 but haven't saved -> pendingAvatarSrc (signed or blob)
+  // - Else show the persisted avatar via keyPath
+  const avatarSrcOverride = draftPreview || pendingAvatarSrc;
+
   return (
     <div className="account-wrap">
       <header className="account-header">
@@ -192,11 +311,14 @@ const Account = () => {
         <p className="account-subtitle">Manage your profile and security.</p>
       </header>
 
+      {/* Debug (optional) */}
+      {/* <pre style={{ fontSize: 12 }}>{JSON.stringify({ profile, pendingAvatarKey }, null, 2)}</pre> */}
+
       {/* Profile */}
       <section className="card">
         <h2 className="card-title">Profile</h2>
         <div className="profile-row">
-          <Avatar keyPath={avatarKey} />
+          <Avatar keyPath={profile?.avatarKey} srcOverride={avatarSrcOverride} />
           <div className="profile-meta">
             <div className="field">
               <label className="label">Display name</label>
@@ -204,14 +326,22 @@ const Account = () => {
                 className="input"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
+                placeholder={profileLoaded ? "Enter display name" : "Loading..."}
+                disabled={!profileLoaded}
               />
               <p className="hint">Shown across the admin portal.</p>
             </div>
-            <p><strong>Email:</strong> yi.yang@example.com <span className="ok">Verified</span></p>
-            <p><strong>Role:</strong> Super Admin</p>
 
-            <div className="profile-actions" style={{ gap: 8, display: "flex", alignItems: "center" }}>
-              <button className="btn primary" onClick={pickFile}>Change profile picture</button>
+            <p>
+              <strong>Email:</strong>{" "}
+              {profile?.email || "—"} <span className="ok">Verified</span>
+            </p>
+            <p><strong>Role:</strong> {profile?.role || "User"}</p>
+
+            <div className="profile-actions" style={{ gap: 8, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+              <button className="btn primary" onClick={pickFile} disabled={!profileLoaded}>
+                Change profile picture
+              </button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -219,14 +349,25 @@ const Account = () => {
                 style={{ display: "none" }}
                 onChange={onPickFile}
               />
+
+              {/* If a staged (pending) avatar exists, let user revert it */}
+              {pendingAvatarKey && (
+                <button className="btn ghost" onClick={revertPendingPhoto}>
+                  Revert photo change
+                </button>
+              )}
+              {pendingAvatarKey && (
+                <span className="badge">Pending photo</span>
+              )}
             </div>
 
+            {/* Draft UI (picked but not uploaded to S3 yet) */}
             {draftPreview && (
               <div className="draft-wrap">
                 <div className="draft-row">
                   <img src={draftPreview} alt="preview" className="avatar preview" />
                   <div style={{ flex: 1 }}>
-                    <div className="hint">Preview — not saved yet</div>
+                    <div className="hint">Preview — not uploaded yet</div>
                     {uploading ? (
                       <div className="progress">
                         <div className="bar" style={{ width: `${progress}%` }} />
@@ -262,9 +403,9 @@ const Account = () => {
           <div className="field">
             <label className="label">Two-Factor Authentication (2FA)</label>
             <div className="inline">
-              <span>Disabled</span>
-              <button className="btn ghost sm" onClick={enable2FA}>Enable 2FA</button>
-              <button className="btn ghost sm" onClick={disable2FA}>Disable 2FA</button>
+              <span>{profile?.twoFactor ? "Enabled" : "Disabled"}</span>
+              <button className="btn ghost sm" onClick={enable2FA} disabled={profile?.twoFactor}>Enable 2FA</button>
+              <button className="btn ghost sm" onClick={disable2FA} disabled={!profile?.twoFactor}>Disable 2FA</button>
             </div>
           </div>
 
@@ -323,7 +464,7 @@ const Account = () => {
 
       <footer className="actions">
         <button className="btn ghost" onClick={() => window.location.reload()}>Reset</button>
-        <button className="btn primary" onClick={save} disabled={saving}>
+        <button className="btn primary" onClick={save} disabled={saving || !profileLoaded}>
           {saving ? "Saving..." : "Save changes"}
         </button>
         {saved && <span className="saved-badge">Saved ✓</span>}
