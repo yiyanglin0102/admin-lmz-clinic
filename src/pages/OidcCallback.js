@@ -1,34 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useAuth } from "react-oidc-context";
-import { useNavigate } from "react-router-dom";
-import '../styles/OidcCallback.css';
+import "../styles/OidcCallback.css";
 
 export default function OidcCallback() {
   const auth = useAuth();
-  const navigate = useNavigate();
-  const [status, setStatus] = useState("Completing sign-in…");
-  const [statusType, setStatusType] = useState(""); // "", "success", "error"
 
   useEffect(() => {
-    if (auth.isAuthenticated) {
-      setStatus("Login successful! Redirecting to dashboard...");
-      setStatusType("success");
-      const timer = setTimeout(() => {
-        navigate("/dashboard");
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
+    // The library completes the flow automatically via onSigninCallback in index.js.
+  }, [auth]);
 
-    if (auth.error) {
-      setStatus("Login failed. Please try again.");
-      setStatusType("error");
-    }
-  }, [auth, navigate]);
+  const { text, tone } = useMemo(() => {
+    if (auth?.error) return { text: "Login failed. Please try again.", tone: "error" };
+    if (auth?.isAuthenticated) return { text: "Login successful! Redirecting…", tone: "success" };
+    return { text: "Completing sign-in…", tone: "info" };
+  }, [auth?.isAuthenticated, auth?.error]);
 
   return (
-    <div className="callback-container">
-      {statusType !== "error" && <div className="spinner"></div>}
-      <div className={`callback-message ${statusType}`}>{status}</div>
+    <div className="oidc-root">
+      <div className="oidc-card">
+        {tone !== "error" && <div className="oidc-spinner" aria-hidden="true" />}
+        <div className={`oidc-message ${tone}`}>{text}</div>
+      </div>
     </div>
   );
 }
