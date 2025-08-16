@@ -67,3 +67,24 @@ export async function listSessions() {
 
     return { sessions };
 }
+
+export async function createSession(payload = {}, { authToken } = {}) {
+  const res = await fetch(`${API_BASE}/auth/create-session`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!res.ok) {
+    const msg = data?.error || data?.message || res.statusText;
+    throw new Error(msg);
+  }
+  return data;
+}
