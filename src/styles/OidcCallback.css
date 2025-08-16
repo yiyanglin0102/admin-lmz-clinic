@@ -7,9 +7,9 @@
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
-/* Card */
+/* Card wrapper */
 .oidc-card {
-  width: min(520px, 92vw);
+  width: min(480px, 92vw);
   background: #fff;
   border-radius: 16px;
   box-shadow:
@@ -48,8 +48,8 @@
 }
 
 /* Status colors */
-.oidc-message.success { color: #16a34a; } /* green-600 */
-.oidc-message.error   { color: #dc2626; } /* red-600 */
+.oidc-message.success { color: #16a34a; } /* green */
+.oidc-message.error   { color: #dc2626; } /* red */
 .oidc-message.info    { color: #334155; } /* default */
 
 /* Respect reduced motion */
