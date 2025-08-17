@@ -49,3 +49,23 @@ export function patchEditSingleCategory(id, updates) {
     body: { id, ...updates },
   });
 }
+
+// POST /category/create-category
+export function createCategory({ name, content }) {
+  if (!name) throw new Error("name is required");
+  return apiFetch("/category/create-category", {
+    method: "POST",
+    body: content ? { name, content } : { name },
+  });
+}
+
+// DELETE /category/delete-category
+export function deleteCategory(id, name) {
+  if (!id) throw new Error("category id is required");
+  return apiFetch("/category/delete-category", {
+    method: "DELETE",
+    body: name ? { id, name } : { id },
+  });
+}
+
+

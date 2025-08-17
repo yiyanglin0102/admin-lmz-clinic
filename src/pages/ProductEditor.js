@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "../styles/Settings.css";
 import { getSettings, patchSettings } from "../services/settings";
-import { getCategorySingle, getAllCategories, patchEditSingleCategory } from "../services/categories";
+import { getCategorySingle, getAllCategories, patchEditSingleCategory, createCategory } from "../services/categories";
 
 
 const Settings = () => {

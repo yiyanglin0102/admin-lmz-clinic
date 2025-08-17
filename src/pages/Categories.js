@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import sampleCategories from "../sample_data/sample_categories.json";
-import { getAllCategories, patchEditSingleCategory } from "../services/categories.js";
+import { getAllCategories, patchEditSingleCategory, createCategory, deleteCategory } from "../services/categories.js";
 import "../styles/Categories.css";
 
 const STORAGE_KEY = "admin.categories";
@@ -36,16 +36,19 @@ const Categories = () => {
         const data = await getAllCategories();
         const normalized = Array.isArray(data)
           ? data.map((item, i) => {
-              const ts = item.createdAt ? Date.parse(item.createdAt) || Date.now() + i : Date.now() + i;
-              return {
-                id: Number.isFinite(Number(item.category_id)) ? Number(item.category_id) : i + 1,
-                name: String(item.category_name ?? "").trim(),
-                createdAt: ts,
-                _raw: item,
-              };
-            })
+            const ts = item.createdAt
+              ? Date.parse(item.createdAt) || Date.now() + i
+              : Date.now() + i;
+            return {
+              id: String(item.category_id),           // keep string id
+              name: String(item.category_name ?? "").trim(),
+              createdAt: ts,
+              _raw: item,
+            };
+          })
           : [];
         setCategories(normalized);
+
       } catch (err) {
         console.error("Failed to fetch categories:", err);
         setToast({ message: `讀取分類失敗：${err.message}` });
@@ -85,17 +88,30 @@ const Categories = () => {
       (c) => c.name.trim() === name.trim() && (ignoreId ? c.id !== ignoreId : true)
     );
 
-  // Add (local only for now)
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const name = newName.trim();
     if (!name) return setToast({ message: "分類名稱不可空白" });
     if (duplicateName(name)) return setToast({ message: "已存在相同分類名稱" });
 
-    const newId = Math.max(0, ...categories.map((c) => Number(c.id) || 0)) + 1;
-    const next = [...categories, { id: newId, name, createdAt: Date.now() }];
-    setCategories(next);
-    setNewName("");
-    setToast({ message: `已新增「${name}」` });
+    try {
+      const created = await createCategory({ name }); // server generates id
+      const ts = created.createdAt ? Date.parse(created.createdAt) : Date.now();
+
+      setCategories((prev) => [
+        ...prev,
+        {
+          id: String(created.category_id),        // string ID from server
+          name: created.category_name,
+          createdAt: ts,
+          _raw: created,
+        },
+      ]);
+
+      setNewName("");
+      setToast({ message: `已新增「${created.category_name}」` });
+    } catch (err) {
+      setToast({ message: `新增失敗：${err.message}` });
+    }
   };
 
   const startEdit = (id, currentName) => {
@@ -184,41 +200,59 @@ const Categories = () => {
     reader.readAsText(file, "utf-8");
   };
 
-  const deleteOne = (id) => {
+  const deleteOne = async (id) => {
     const target = categories.find((c) => c.id === id);
+    if (!target) return;
+
+    // optimistic remove
+    const prev = categories;
     const next = categories.filter((c) => c.id !== id);
     setCategories(next);
-    lastDeletedRef.current = { type: "single", data: target };
-    setToast({
-      message: `已刪除「${target?.name}」`,
-      actionLabel: "復原",
-      onAction: () => {
-        if (!lastDeletedRef.current) return;
-        setCategories((prev) => [...prev, lastDeletedRef.current.data]);
-        lastDeletedRef.current = null;
-        setToast({ message: "已復原" });
-      },
-    });
+
+    try {
+      await deleteCategory(String(id), target.name);
+      setToast({
+        message: `已刪除「${target.name}」`,
+        actionLabel: "復原",
+        onAction: async () => {
+          // (optional) re-create via your create endpoint if you want true undo,
+          // otherwise just restore UI:
+          setCategories(prev);
+          setToast({ message: "已復原" });
+        },
+      });
+    } catch (err) {
+      // rollback on failure
+      setCategories(prev);
+      const msg =
+        err?.message === "Not found"
+          ? `找不到要刪除的項目（id=${id}）`
+          : err?.message === "Multiple items share this id; provide 'name' to disambiguate."
+            ? "同一 id 有多筆資料，請提供名稱以刪除正確項目"
+            : `刪除失敗：${err?.message || "未知錯誤"}`;
+      setToast({ message: msg });
+    }
   };
 
-  const deleteSelected = () => {
-    if (selectedIds.size === 0) return;
-    const deleted = categories.filter((c) => selectedIds.has(c.id));
-    const kept = categories.filter((c) => !selectedIds.has(c.id));
-    setCategories(kept);
-    setSelectedIds(new Set());
-    lastDeletedRef.current = { type: "bulk", data: deleted };
-    setToast({
-      message: `已刪除 ${deleted.length} 筆`,
-      actionLabel: "復原",
-      onAction: () => {
-        if (!lastDeletedRef.current) return;
-        setCategories((prev) => [...prev, ...lastDeletedRef.current.data]);
-        lastDeletedRef.current = null;
-        setToast({ message: "已復原" });
-      },
-    });
-  };
+const deleteSelected = async () => {
+  if (selectedIds.size === 0) return;
+  const toDelete = categories.filter((c) => selectedIds.has(c.id));
+  const prev = categories;
+  setCategories(prev.filter((c) => !selectedIds.has(c.id)));
+  setSelectedIds(new Set());
+
+  try {
+    await Promise.all(
+      toDelete.map((c) => deleteCategory(String(c.id), c.name))
+    );
+    setToast({ message: `已刪除 ${toDelete.length} 筆` });
+  } catch (err) {
+    // rollback on any failure
+    setCategories(prev);
+    setToast({ message: `批次刪除失敗：${err?.message || "未知錯誤"}` });
+  }
+};
+
 
   const toggleSelectAll = (checked) => {
     if (checked) setSelectedIds(new Set(view.map((v) => v.id)));
