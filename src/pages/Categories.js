@@ -1,48 +1,66 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import sampleCategories from "../sample_data/sample_categories.json";
+import { getCategories, patchCategorySingle } from "../services/categories.js";
 import "../styles/Categories.css";
 
-/**
- * 功能亮點
- * - 搜尋 / 排序 (A→Z / Z→A / 建立時間)
- * - 新增/編輯即時驗證（防重複、空白）
- * - 批次選取與刪除（帶確認）
- * - 刪除後 6 秒內可 Undo
- * - 鍵盤快捷鍵：Enter=保存、Esc=取消
- * - LocalStorage 持久化
- * - 匯出 / 匯入（JSON）
- */
 const STORAGE_KEY = "admin.categories";
 
 const Categories = () => {
   const [categories, setCategories] = useState(() => {
     const fromLS = localStorage.getItem(STORAGE_KEY);
     if (fromLS) return JSON.parse(fromLS);
-    // seed 初始資料，加上 createdAt
     const seeded =
       (sampleCategories?.categories || []).map((c, idx) => ({
         ...c,
-        createdAt: c.createdAt || Date.now() + idx, // 保序
+        createdAt: c.createdAt || Date.now() + idx,
       })) ?? [];
     return seeded;
   });
 
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState(null); // ← disable Save while calling API
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("createdAt"); // nameAsc | nameDesc | createdAt
+  const [sortBy, setSortBy] = useState("createdAt");
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState("");
   const [newName, setNewName] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [toast, setToast] = useState(null); // { message, actionLabel, onAction }
+  const [toast, setToast] = useState(null);
   const lastDeletedRef = useRef(null);
 
-  // 持久化
+  // Fetch from API
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getCategories();
+        const normalized = Array.isArray(data)
+          ? data.map((item, i) => {
+              const ts = item.createdAt ? Date.parse(item.createdAt) || Date.now() + i : Date.now() + i;
+              return {
+                id: Number.isFinite(Number(item.category_id)) ? Number(item.category_id) : i + 1,
+                name: String(item.category_name ?? "").trim(),
+                createdAt: ts,
+                _raw: item,
+              };
+            })
+          : [];
+        setCategories(normalized);
+      } catch (err) {
+        console.error("Failed to fetch categories:", err);
+        setToast({ message: `讀取分類失敗：${err.message}` });
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  // Persist to LS for now
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
   }, [categories]);
 
-  // 篩選 + 排序
+  // Filter + sort
   const view = useMemo(() => {
     let list = [...categories];
     if (search.trim()) {
@@ -57,7 +75,6 @@ const Categories = () => {
         list.sort((a, b) => b.name.localeCompare(a.name, "zh-Hant"));
         break;
       default:
-        // createdAt
         list.sort((a, b) => a.createdAt - b.createdAt);
     }
     return list;
@@ -68,91 +85,70 @@ const Categories = () => {
       (c) => c.name.trim() === name.trim() && (ignoreId ? c.id !== ignoreId : true)
     );
 
-  // 新增
+  // Add (local only for now)
   const handleAdd = () => {
     const name = newName.trim();
     if (!name) return setToast({ message: "分類名稱不可空白" });
     if (duplicateName(name)) return setToast({ message: "已存在相同分類名稱" });
 
-    const newId = Math.max(0, ...categories.map((c) => c.id)) + 1;
-    const next = [
-      ...categories,
-      { id: newId, name, createdAt: Date.now() },
-    ];
+    const newId = Math.max(0, ...categories.map((c) => Number(c.id) || 0)) + 1;
+    const next = [...categories, { id: newId, name, createdAt: Date.now() }];
     setCategories(next);
     setNewName("");
     setToast({ message: `已新增「${name}」` });
   };
 
-  // 編輯
   const startEdit = (id, currentName) => {
     setEditingId(id);
     setEditValue(currentName);
   };
+
   const cancelEdit = () => {
     setEditingId(null);
     setEditValue("");
   };
-  const saveEdit = (id) => {
-    const name = editValue.trim();
+
+  // 🔧 New: API-backed rename
+  const editName = async (id, nextName) => {
+    const name = nextName.trim();
     if (!name) return setToast({ message: "分類名稱不可空白" });
     if (duplicateName(name, id)) return setToast({ message: "已存在相同分類名稱" });
 
-    setCategories((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, name } : c))
-    );
-    setEditingId(null);
-    setToast({ message: `已更新為「${name}」` });
-  };
+    const oldName = categories.find((c) => c.id === id)?.name || "";
+    if (oldName === name) {
+      setEditingId(null);
+      setEditValue("");
+      return;
+    }
 
-  // 單筆刪除（帶 Undo）
-  const deleteOne = (id) => {
-    const target = categories.find((c) => c.id === id);
-    const next = categories.filter((c) => c.id !== id);
-    setCategories(next);
-    lastDeletedRef.current = { type: "single", data: target };
-    setToast({
-      message: `已刪除「${target?.name}」`,
-      actionLabel: "復原",
-      onAction: () => {
-        if (!lastDeletedRef.current) return;
-        setCategories((prev) => [...prev, lastDeletedRef.current.data]);
-        lastDeletedRef.current = null;
-        setToast({ message: "已復原" });
-      },
-    });
-  };
+    // Optimistic update
+    const prev = categories;
+    setSavingId(id);
+    setCategories((cur) => cur.map((c) => (c.id === id ? { ...c, name } : c)));
 
-  // 批次刪除
-  const deleteSelected = () => {
-    if (selectedIds.size === 0) return;
-    const deleted = categories.filter((c) => selectedIds.has(c.id));
-    const kept = categories.filter((c) => !selectedIds.has(c.id));
-    setCategories(kept);
-    setSelectedIds(new Set());
-    lastDeletedRef.current = { type: "bulk", data: deleted };
-    setToast({
-      message: `已刪除 ${deleted.length} 筆`,
-      actionLabel: "復原",
-      onAction: () => {
-        if (!lastDeletedRef.current) return;
-        setCategories((prev) => [...prev, ...lastDeletedRef.current.data]);
-        lastDeletedRef.current = null;
-        setToast({ message: "已復原" });
-      },
-    });
-  };
-
-  // 全選/反選
-  const toggleSelectAll = (checked) => {
-    if (checked) {
-      setSelectedIds(new Set(view.map((v) => v.id)));
-    } else {
-      setSelectedIds(new Set());
+    try {
+      await patchCategorySingle(String(id), { name, oldName });
+      setToast({ message: `已更新為「${name}」` });
+    } catch (err) {
+      // revert on error
+      setCategories(prev);
+      const msg =
+        err?.message === "Rename conflict (destination exists or source missing)."
+          ? "更新失敗：名稱已存在或資料已變更"
+          : `更新失敗：${err?.message || "未知錯誤"}`;
+      setToast({ message: msg });
+    } finally {
+      setSavingId(null);
+      setEditingId(null);
+      setEditValue("");
     }
   };
 
-  // 匯出 / 匯入
+  // Save button calls editName
+  const saveEdit = (id) => {
+    editName(id, editValue);
+  };
+
   const exportJson = () => {
     const data = JSON.stringify(categories, null, 2);
     const blob = new Blob([data], { type: "application/json;charset=utf-8" });
@@ -172,7 +168,6 @@ const Categories = () => {
       try {
         const parsed = JSON.parse(reader.result);
         if (!Array.isArray(parsed)) throw new Error("格式錯誤");
-        // 標準化
         const normalized = parsed.map((c, i) => ({
           id: Number(c.id ?? i + 1),
           name: String(c.name ?? "").trim(),
@@ -180,7 +175,7 @@ const Categories = () => {
         }));
         setCategories(normalized);
         setToast({ message: "匯入成功" });
-      } catch (err) {
+      } catch {
         setToast({ message: "匯入失敗：檔案格式不正確" });
       } finally {
         e.target.value = "";
@@ -189,12 +184,47 @@ const Categories = () => {
     reader.readAsText(file, "utf-8");
   };
 
-  // UI helpers
-  const isAllChecked =
-    view.length > 0 && view.every((v) => selectedIds.has(v.id));
-  const hasSelection = selectedIds.size > 0;
+  const deleteOne = (id) => {
+    const target = categories.find((c) => c.id === id);
+    const next = categories.filter((c) => c.id !== id);
+    setCategories(next);
+    lastDeletedRef.current = { type: "single", data: target };
+    setToast({
+      message: `已刪除「${target?.name}」`,
+      actionLabel: "復原",
+      onAction: () => {
+        if (!lastDeletedRef.current) return;
+        setCategories((prev) => [...prev, lastDeletedRef.current.data]);
+        lastDeletedRef.current = null;
+        setToast({ message: "已復原" });
+      },
+    });
+  };
 
-  // 自動隱藏 toast
+  const deleteSelected = () => {
+    if (selectedIds.size === 0) return;
+    const deleted = categories.filter((c) => selectedIds.has(c.id));
+    const kept = categories.filter((c) => !selectedIds.has(c.id));
+    setCategories(kept);
+    setSelectedIds(new Set());
+    lastDeletedRef.current = { type: "bulk", data: deleted };
+    setToast({
+      message: `已刪除 ${deleted.length} 筆`,
+      actionLabel: "復原",
+      onAction: () => {
+        if (!lastDeletedRef.current) return;
+        setCategories((prev) => [...prev, ...lastDeletedRef.current.data]);
+        lastDeletedRef.current = null;
+        setToast({ message: "已復原" });
+      },
+    });
+  };
+
+  const toggleSelectAll = (checked) => {
+    if (checked) setSelectedIds(new Set(view.map((v) => v.id)));
+    else setSelectedIds(new Set());
+  };
+
   useEffect(() => {
     if (!toast || toast.onAction) return;
     const t = setTimeout(() => setToast(null), 1800);
@@ -204,6 +234,8 @@ const Categories = () => {
   return (
     <div className="categories-container">
       <div className="categories-header">產品分類管理</div>
+
+      {loading && <div className="loading">載入中…</div>}
 
       {/* 工具列 */}
       <div className="toolbar">
@@ -227,18 +259,16 @@ const Categories = () => {
         </div>
 
         <div className="toolbar-right">
-          <button className="button ghost" onClick={exportJson}>
-            匯出
-          </button>
+          <button className="button ghost" onClick={exportJson}>匯出</button>
           <label className="button ghost file-label">
             匯入
             <input type="file" accept="application/json" onChange={importJson} />
           </label>
           <button
             className="button danger"
-            disabled={!hasSelection}
+            disabled={selectedIds.size === 0}
             onClick={() => setConfirmOpen(true)}
-            title={hasSelection ? "刪除所選" : "未選取資料"}
+            title={selectedIds.size ? "刪除所選" : "未選取資料"}
           >
             批次刪除
           </button>
@@ -253,13 +283,9 @@ const Categories = () => {
           onChange={(e) => setNewName(e.target.value)}
           placeholder="輸入新分類名稱"
           className="category-input"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleAdd();
-          }}
+          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
         />
-        <button className="add-button" onClick={handleAdd}>
-          新增分類
-        </button>
+        <button className="add-button" onClick={handleAdd}>新增分類</button>
       </div>
 
       {/* 資料列 */}
@@ -271,7 +297,7 @@ const Categories = () => {
             <label className="checkbox">
               <input
                 type="checkbox"
-                checked={isAllChecked}
+                checked={view.length > 0 && view.every((v) => selectedIds.has(v.id))}
                 onChange={(e) => toggleSelectAll(e.target.checked)}
               />
               <span />
@@ -283,6 +309,7 @@ const Categories = () => {
 
           {view.map((category) => {
             const checked = selectedIds.has(category.id);
+            const isSaving = savingId === category.id;
             return (
               <div key={category.id} className="table-row">
                 <label className="checkbox">
@@ -299,7 +326,6 @@ const Categories = () => {
                   <span />
                 </label>
 
-                {/* 名稱 / 編輯 */}
                 <div className="col-name">
                   {editingId === category.id ? (
                     <input
@@ -308,9 +334,10 @@ const Categories = () => {
                       autoFocus
                       onChange={(e) => setEditValue(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") saveEdit(category.id);
+                        if (e.key === "Enter" && !isSaving) saveEdit(category.id);
                         if (e.key === "Escape") cancelEdit();
                       }}
+                      disabled={isSaving}
                     />
                   ) : (
                     <span className="category-name">{category.name}</span>
@@ -327,10 +354,12 @@ const Categories = () => {
                       <button
                         className="button save-button"
                         onClick={() => saveEdit(category.id)}
+                        disabled={isSaving}
+                        title={isSaving ? "更新中…" : "保存"}
                       >
-                        保存
+                        {isSaving ? "更新中…" : "保存"}
                       </button>
-                      <button className="button cancel-button" onClick={cancelEdit}>
+                      <button className="button cancel-button" onClick={cancelEdit} disabled={isSaving}>
                         取消
                       </button>
                     </>
@@ -366,9 +395,7 @@ const Categories = () => {
               確定要刪除 {selectedIds.size} 筆已選取的分類嗎？此動作可在短時間內復原。
             </div>
             <div className="modal-actions">
-              <button className="button" onClick={() => setConfirmOpen(false)}>
-                取消
-              </button>
+              <button className="button" onClick={() => setConfirmOpen(false)}>取消</button>
               <button
                 className="button danger"
                 onClick={() => {
@@ -398,9 +425,7 @@ const Categories = () => {
               {toast.actionLabel}
             </button>
           )}
-          <button className="toast-close" onClick={() => setToast(null)}>
-            ×
-          </button>
+          <button className="toast-close" onClick={() => setToast(null)}>×</button>
         </div>
       )}
     </div>

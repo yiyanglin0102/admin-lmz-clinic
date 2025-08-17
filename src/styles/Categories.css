@@ -157,8 +157,8 @@
   background: #fff; border-radius: 14px; padding: 1rem;
   box-shadow: 0 10px 30px rgba(0,0,0,.2);
 }
-.modal-title { font-weight: 800; font-size: 1.1rem; margin-bottom: 0.5rem; }
-.modal-body { color: #4a5568; margin-bottom: 1rem; }
+.modal-title { color: #d9dce2; font-weight: 800; font-size: 1.1rem; margin-bottom: 0.5rem; }
+.modal-body { color: #d9dce2; margin-bottom: 1rem; }
 .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
 
 /* Toast */
