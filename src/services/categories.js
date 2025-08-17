@@ -23,29 +23,29 @@ async function apiFetch(path, { method = "GET", body, headers } = {}) {
 }
 
 // optional list if you add it later
-export function getCategories() {
-  return apiFetch("/categories");
+export function getAllCategories() {
+  return apiFetch("/category/get-all-categories");
 }
 
 // const data = await getCategorySingle("3");
 // GET /category-single?id=1
 export function getCategorySingle(id) {
   if (!id) throw new Error("category id is required");
-  return apiFetch(`/category-single?id=${encodeURIComponent(id)}`);
+  return apiFetch(`/category/get-single-category?id=${encodeURIComponent(id)}`);
 }
 
-// PATCH /patch-category/{id}
+// PATCH /category/edit-category/{id}
 // Body examples:
 //   { name: "新名稱" }
 //   { name: "新名稱", oldName: "舊名稱" }
 //   { content: "描述..." }       // update non-key field only
-export function patchCategorySingle(id, updates) {
+export function patchEditSingleCategory(id, updates) {
   if (!id || !updates || typeof updates !== "object") {
     throw new Error("id and body are required");
   }
   // Lambda expects id in the body and is mounted on /patch-category
-  return apiFetch("/patch-category", {
+  return apiFetch("/category/edit-category", {
     method: "PATCH",
-    body: { id, ...updates },   // <-- include id here
+    body: { id, ...updates },
   });
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import sampleCategories from "../sample_data/sample_categories.json";
-import { getCategories, patchCategorySingle } from "../services/categories.js";
+import { getAllCategories, patchEditSingleCategory } from "../services/categories.js";
 import "../styles/Categories.css";
 
 const STORAGE_KEY = "admin.categories";
@@ -33,7 +33,7 @@ const Categories = () => {
   useEffect(() => {
     (async () => {
       try {
-        const data = await getCategories();
+        const data = await getAllCategories();
         const normalized = Array.isArray(data)
           ? data.map((item, i) => {
               const ts = item.createdAt ? Date.parse(item.createdAt) || Date.now() + i : Date.now() + i;
@@ -127,7 +127,7 @@ const Categories = () => {
     setCategories((cur) => cur.map((c) => (c.id === id ? { ...c, name } : c)));
 
     try {
-      await patchCategorySingle(String(id), { name, oldName });
+      await patchEditSingleCategory(String(id), { name, oldName });
       setToast({ message: `已更新為「${name}」` });
     } catch (err) {
       // revert on error
