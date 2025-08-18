@@ -22,44 +22,47 @@ async function apiFetch(path, { method = "GET", body, headers } = {}) {
   return data;
 }
 
-// optional list if you add it later
+// ----- existing endpoints -----
 export function getAllCategories() {
   return apiFetch("/category/get-all-categories");
 }
 
-// const data = await getCategorySingle("3");
-// GET /category-single?id=1
 export function getCategorySingle(id) {
   if (!id) throw new Error("category id is required");
   return apiFetch(`/category/get-single-category?id=${encodeURIComponent(id)}`);
 }
 
-// PATCH /category/edit-category/{id}
-// Body examples:
-//   { name: "新名稱" }
-//   { name: "新名稱", oldName: "舊名稱" }
-//   { content: "描述..." }       // update non-key field only
 export function patchEditSingleCategory(id, updates) {
   if (!id || !updates || typeof updates !== "object") {
     throw new Error("id and body are required");
   }
-  // Lambda expects id in the body and is mounted on /patch-category
   return apiFetch("/category/edit-category", {
     method: "PATCH",
     body: { id, ...updates },
   });
 }
 
-// POST /category/create-category
-export function createCategory({ name, content }) {
+// ✅ Updated: allow optional id/createdAt/content/restore for true “undo create”
+export function createCategory({ name, id, createdAt, content, restore } = {}) {
   if (!name) throw new Error("name is required");
+  const body = { name };
+  if (id != null) body.id = String(id);                 // let backend honor fixed id
+  if (createdAt != null) body.createdAt = createdAt;    // ISO string or epoch
+  if (content != null) body.content = content;
+  if (restore === true) body.restore = true;            // hint for backend logic (optional)
+
   return apiFetch("/category/create-category", {
     method: "POST",
-    body: content ? { name, content } : { name },
+    body,
   });
 }
 
-// DELETE /category/delete-category
+// Tiny convenience helper used by the UI when clicking 「復原」
+export function restoreCategory({ id, name, createdAt, content } = {}) {
+  if (!id || !name) throw new Error("id and name are required");
+  return createCategory({ id, name, createdAt, content, restore: true });
+}
+
 export function deleteCategory(id, name) {
   if (!id) throw new Error("category id is required");
   return apiFetch("/category/delete-category", {
@@ -67,5 +70,3 @@ export function deleteCategory(id, name) {
     body: name ? { id, name } : { id },
   });
 }
-
-

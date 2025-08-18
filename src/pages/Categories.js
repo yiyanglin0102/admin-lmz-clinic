@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import sampleCategories from "../sample_data/sample_categories.json";
-import { getAllCategories, patchEditSingleCategory, createCategory, deleteCategory } from "../services/categories.js";
+import { getAllCategories, patchEditSingleCategory, createCategory, deleteCategory, restoreCategory } from "../services/categories.js";
 import "../styles/Categories.css";
 
 const STORAGE_KEY = "admin.categories";
@@ -18,7 +18,7 @@ const Categories = () => {
   });
 
   const [loading, setLoading] = useState(true);
-  const [savingId, setSavingId] = useState(null); // ← disable Save while calling API
+  const [savingId, setSavingId] = useState(null);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("createdAt");
   const [editingId, setEditingId] = useState(null);
@@ -40,7 +40,7 @@ const Categories = () => {
               ? Date.parse(item.createdAt) || Date.now() + i
               : Date.now() + i;
             return {
-              id: String(item.category_id),           // keep string id
+              id: String(item.category_id),
               name: String(item.category_name ?? "").trim(),
               createdAt: ts,
               _raw: item,
@@ -100,7 +100,7 @@ const Categories = () => {
       setCategories((prev) => [
         ...prev,
         {
-          id: String(created.category_id),        // string ID from server
+          id: String(created.category_id),
           name: created.category_name,
           createdAt: ts,
           _raw: created,
@@ -124,7 +124,6 @@ const Categories = () => {
     setEditValue("");
   };
 
-  // 🔧 New: API-backed rename
   const editName = async (id, nextName) => {
     const name = nextName.trim();
     if (!name) return setToast({ message: "分類名稱不可空白" });
@@ -160,7 +159,6 @@ const Categories = () => {
     }
   };
 
-  // Save button calls editName
   const saveEdit = (id) => {
     editName(id, editValue);
   };
@@ -204,26 +202,57 @@ const Categories = () => {
     const target = categories.find((c) => c.id === id);
     if (!target) return;
 
-    // optimistic remove
-    const prev = categories;
-    const next = categories.filter((c) => c.id !== id);
-    setCategories(next);
+    // Keep a copy for undo
+    const prevList = categories;
+    lastDeletedRef.current = { ...target };
+
+    // Optimistic UI removal
+    setCategories(prevList.filter((c) => c.id !== id));
 
     try {
+      // Server delete
       await deleteCategory(String(id), target.name);
+
+      // Toast with Undo
       setToast({
         message: `已刪除「${target.name}」`,
         actionLabel: "復原",
         onAction: async () => {
-          // (optional) re-create via your create endpoint if you want true undo,
-          // otherwise just restore UI:
-          setCategories(prev);
-          setToast({ message: "已復原" });
+          const { id, name, createdAt } = lastDeletedRef.current || {};
+          try {
+            // Call backend to recreate with the same id/name
+            const res = await restoreCategory({
+              id,
+              name,
+              createdAt: new Date(createdAt).toISOString(),
+            });
+
+            // If backend ever ignores custom id, fall back to the returned one
+            const restoredId = String(res?.category_id ?? id);
+            const restoredName = String(res?.category_name ?? name);
+
+            setCategories((cur) => [
+              ...cur,
+              { id: restoredId, name: restoredName, createdAt, _raw: res ?? target._raw },
+            ]);
+            setToast({ message: "已復原" });
+          } catch (e) {
+            // 409 means it already exists (e.g., another tab restored it)
+            const msg = (e?.message || "").includes("exists")
+              ? "項目已存在，無需復原"
+              : `復原失敗（已暫時還原畫面）：${e?.message || e}`;
+            // Put it back visually to avoid data loss
+            setCategories(prevList);
+            setToast({ message: msg });
+          } finally {
+            lastDeletedRef.current = null;
+          }
         },
       });
     } catch (err) {
-      // rollback on failure
-      setCategories(prev);
+      // Rollback on delete error
+      setCategories(prevList);
+      lastDeletedRef.current = null;
       const msg =
         err?.message === "Not found"
           ? `找不到要刪除的項目（id=${id}）`
@@ -234,24 +263,25 @@ const Categories = () => {
     }
   };
 
-const deleteSelected = async () => {
-  if (selectedIds.size === 0) return;
-  const toDelete = categories.filter((c) => selectedIds.has(c.id));
-  const prev = categories;
-  setCategories(prev.filter((c) => !selectedIds.has(c.id)));
-  setSelectedIds(new Set());
 
-  try {
-    await Promise.all(
-      toDelete.map((c) => deleteCategory(String(c.id), c.name))
-    );
-    setToast({ message: `已刪除 ${toDelete.length} 筆` });
-  } catch (err) {
-    // rollback on any failure
-    setCategories(prev);
-    setToast({ message: `批次刪除失敗：${err?.message || "未知錯誤"}` });
-  }
-};
+  const deleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    const toDelete = categories.filter((c) => selectedIds.has(c.id));
+    const prev = categories;
+    setCategories(prev.filter((c) => !selectedIds.has(c.id)));
+    setSelectedIds(new Set());
+
+    try {
+      await Promise.all(
+        toDelete.map((c) => deleteCategory(String(c.id), c.name))
+      );
+      setToast({ message: `已刪除 ${toDelete.length} 筆` });
+    } catch (err) {
+      // rollback on any failure
+      setCategories(prev);
+      setToast({ message: `批次刪除失敗：${err?.message || "未知錯誤"}` });
+    }
+  };
 
 
   const toggleSelectAll = (checked) => {
