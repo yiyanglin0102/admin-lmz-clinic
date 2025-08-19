@@ -1,0 +1,122 @@
+.pp-container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+.pp-header { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+
+.pp-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+.pp-input { flex: 1; padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; }
+.pp-btn { padding: 8px 12px; border: 1px solid #ddd; background: #fff; border-radius: 6px; cursor: pointer; }
+.pp-btn.ghost { background: #f8f9fa; }
+.pp-btn.primary { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+.pp-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.pp-accordion { display: grid; gap: 10px; }
+.pp-section { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; background: #fff; }
+.pp-cat-header { width: 100%; display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; padding: 12px 14px; background: #f7f8fa; border: 0; cursor: pointer; text-align: left; }
+.pp-caret { transition: transform .2s ease; }
+.pp-caret.open { transform: rotate(90deg); }
+.pp-cat-name { font-weight: 600; }
+.pp-cat-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #6b7280; }
+.pp-count { font-size: 12px; color: #6b7280; }
+
+.pp-panel { padding: 12px; }
+.pp-empty { color: #6b7280; padding: 12px; }
+
+.pp-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.pp-card { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; background: #fff; transition: transform .12s ease, box-shadow .12s ease; }
+.pp-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.06); }
+.pp-thumb { aspect-ratio: 16 / 10; background: #f3f4f6; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.pp-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pp-card-body { padding: 10px; display: grid; gap: 6px; }
+.pp-product-name { font-weight: 600; }
+.pp-price { color: #111827; }
+
+.pp-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; padding: 20px; z-index: 1000; }
+.pp-modal { width: min(900px, 100%); max-height: 90vh; background: #fff; border-radius: 10px; overflow: hidden; display: grid; grid-template-rows: auto 1fr auto; }
+.pp-modal-header, .pp-modal-footer { padding: 12px 14px; background: #f7f8fa; display: flex; align-items: center; justify-content: space-between; }
+.pp-modal-title { font-weight: 700; }
+.pp-icon-btn { border: 0; background: transparent; font-size: 22px; cursor: pointer; }
+
+.pp-modal-body { padding: 14px; overflow: auto; display: grid; gap: 14px; }
+.pp-hero { display: grid; gap: 8px; }
+.pp-hero img { width: 100%; height: auto; border-radius: 8px; }
+.pp-hero-nav { display: flex; gap: 8px; align-items: center; justify-content: center; }
+
+.pp-thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+.pp-thumb-btn { border: 2px solid transparent; padding: 0; background: transparent; border-radius: 6px; overflow: hidden; }
+.pp-thumb-btn.active { border-color: #1f6feb; }
+.pp-thumb-btn img { width: 72px; height: 48px; object-fit: cover; display: block; }
+
+.pp-details { display: grid; gap: 4px; }
+.pp-detail-row { display: grid; grid-template-columns: 90px 1fr; gap: 6px; font-size: 14px; }
+.pp-detail-label { color: #6b7280; }
+.pp-desc { margin-top: 6px; line-height: 1.6; }
+/* Layout + basics (if not already present from earlier snippet) */
+.pp-container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+.pp-header { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+.pp-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+.pp-input { flex: 1; padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; }
+.pp-textarea { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; resize: vertical; }
+.pp-btn { padding: 8px 12px; border: 1px solid #ddd; background: #fff; border-radius: 6px; cursor: pointer; }
+.pp-btn.ghost { background: #f8f9fa; }
+.pp-btn.primary { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+.pp-btn:disabled { opacity: .5; cursor: not-allowed; }
+.pp-muted { color: #6b7280; }
+
+/* Accordion */
+.pp-accordion { display: grid; gap: 10px; }
+.pp-section { border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; overflow: hidden; }
+.pp-cat-header { width: 100%; display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; padding: 12px 14px; background: #f7f8fa; border: 0; cursor: pointer; text-align: left; }
+.pp-caret { transition: transform .2s; }
+.pp-caret.open { transform: rotate(90deg); }
+.pp-cat-name { font-weight: 600; }
+.pp-cat-id, .pp-count { font-size: 12px; color: #6b7280; }
+.pp-panel { padding: 12px; }
+.pp-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.pp-empty { color: #6b7280; padding: 12px; }
+
+/* Product cards */
+.pp-card { border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; overflow: hidden; transition: transform .12s, box-shadow .12s; }
+.pp-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.06); }
+.pp-thumb { aspect-ratio: 16 / 10; background: #f3f4f6; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.pp-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pp-card-body { padding: 10px; display: grid; gap: 6px; }
+.pp-product-name { font-weight: 600; }
+.pp-price-strike { color: #9ca3af; text-decoration: line-through; margin-left: 6px; }
+.pp-price-sale { color: #b91c1c; font-weight: 700; }
+
+/* Modal */
+.pp-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 20px; z-index: 1000; }
+.pp-modal { width: min(1000px, 100%); max-height: 90vh; background: #fff; border-radius: 10px; overflow: hidden; display: grid; grid-template-rows: auto 1fr; }
+.pp-modal-header { padding: 12px 14px; background: #f7f8fa; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pp-modal-title { font-weight: 700; }
+.pp-actions { display: flex; gap: 8px; }
+.pp-modal-body { padding: 14px; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .pp-modal-body { grid-template-columns: 1fr; } }
+
+/* Gallery */
+.pp-hero .main { aspect-ratio: 16/10; margin-bottom: 8px; }
+.pp-hero .main img { width: 100%; height: 100%; object-fit: cover; }
+.pp-thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+.pp-thumb-btn { position: relative; border: 2px solid transparent; border-radius: 6px; overflow: hidden; }
+.pp-thumb-btn.active { border-color: #1f6feb; }
+.pp-thumb-click { padding: 0; background: transparent; border: 0; display: block; cursor: pointer; }
+.pp-thumb-btn img { width: 72px; height: 48px; object-fit: cover; display: block; }
+.pp-thumb-close { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,.55); color: #fff; border: 0; border-radius: 50%; width: 18px; height: 18px; line-height: 18px; font-size: 12px; cursor: pointer; }
+.pp-upload-tile { display: grid; place-items: center; width: 72px; height: 48px; border: 1px dashed #bbb; color: #555; border-radius: 6px; cursor: pointer; }
+
+/* Detail / Form */
+.pp-details { display: grid; gap: 8px; font-size: 14px; }
+.pp-detail-row { display: grid; grid-template-columns: 90px 1fr; gap: 6px; }
+.pp-detail-label { color: #6b7280; }
+
+/* Form sections */
+.pp-form { display: grid; gap: 14px; }
+.pp-fieldset { border: 1px solid #e5e7eb; padding: 12px; border-radius: 8px; }
+.pp-fieldset > legend { padding: 0 6px; color: #374151; font-weight: 600; }
+.pp-field { display: grid; gap: 6px; margin-bottom: 10px; }
+.pp-label { font-size: 12px; color: #6b7280; }
+.pp-2col { display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); }
+.pp-4col { display: grid; gap: 10px; grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 720px) { .pp-4col { grid-template-columns: repeat(2, 1fr); } .pp-2col { grid-template-columns: 1fr; } }
+.pp-inline { display: flex; gap: 8px; align-items: center; }
+.pp-hint { color: #374151; margin-top: 4px; }
+.pp-price { font-weight: 600; color: #111827; }
