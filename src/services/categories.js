@@ -42,7 +42,7 @@ export function patchEditSingleCategory(id, updates) {
   });
 }
 
-// ✅ Updated: allow optional id/createdAt/content/restore for true “undo create”
+// Allow optional id/createdAt/content/restore for true “undo create”
 export function createCategory({ name, id, createdAt, content, restore } = {}) {
   if (!name) throw new Error("name is required");
   const body = { name };

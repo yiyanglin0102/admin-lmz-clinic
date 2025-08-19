@@ -1,109 +1,11 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import "../styles/ProductProduct.css"; // ← your stylesheet
+import "../styles/ProductProduct.css";
+import { getAllProducts } from "../services/products";
 
-// -------------------- Hardcoded sample data --------------------
-const CATEGORIES = [
-  { id: "7183c3c907b543ff8ea9b3c4bf4165e7", name: "抗老緊緻系列", createdAt: "2025-08-18T14:23:13.136Z" },
-  { id: "b07b9b9a6c2a4120a7e1e1f5a3bc1212", name: "深層保濕系列", createdAt: "2025-08-10T12:00:00Z" },
-  { id: "c6a87cd6d6d9444ab54a44b690112233", name: "淨痘調理系列", createdAt: "2025-08-12T09:30:00Z" },
-];
-
-const SEED_PRODUCTS = [
-  {
-    id: "P-1001",
-    categoryId: "7183c3c907b543ff8ea9b3c4bf4165e7",
-    name: "極緻抗老精華 30ml",
-    description: "高濃度胜肽與維他命A衍生物，緊緻提拉，改善細紋。",
-    regularPrice: 1980,
-    salePrice: 1680,
-    stockQty: 42,
-    restockThreshold: 10,
-    shipping: { weightKg: 0.18, lengthCm: 12, widthCm: 4, heightCm: 4, fee: 60 },
-    photos: [
-      "https://picsum.photos/seed/antiage1/640/400",
-      "https://picsum.photos/seed/antiage1b/640/400",
-      "https://picsum.photos/seed/antiage1c/640/400",
-    ],
-  },
-  {
-    id: "P-1002",
-    categoryId: "7183c3c907b543ff8ea9b3c4bf4165e7",
-    name: "彈力緊緻乳霜 50ml",
-    description: "胜肽複合配方，強化肌膚結構，維持彈力與飽滿。",
-    regularPrice: 1680,
-    salePrice: null,
-    stockQty: 30,
-    restockThreshold: 8,
-    shipping: { weightKg: 0.22, lengthCm: 8, widthCm: 8, heightCm: 6, fee: 60 },
-    photos: [
-      "https://picsum.photos/seed/antiage2/640/400",
-      "https://picsum.photos/seed/antiage2b/640/400",
-    ],
-  },
-  {
-    id: "P-2001",
-    categoryId: "b07b9b9a6c2a4120a7e1e1f5a3bc1212",
-    name: "深層保濕精華 30ml",
-    description: "玻尿酸三重鎖水，迅速補水並提升保水力。",
-    regularPrice: 1280,
-    salePrice: 1160,
-    stockQty: 25,
-    restockThreshold: 6,
-    shipping: { weightKg: 0.16, lengthCm: 12, widthCm: 4, heightCm: 4, fee: 60 },
-    photos: [
-      "https://picsum.photos/seed/hydra1/640/400",
-      "https://picsum.photos/seed/hydra1b/640/400",
-    ],
-  },
-  {
-    id: "P-2002",
-    categoryId: "b07b9b9a6c2a4120a7e1e1f5a3bc1212",
-    name: "水潤修護面霜 50ml",
-    description: "神經醯胺配方，強化肌膚屏障，長效保濕不黏膩。",
-    regularPrice: 1380,
-    salePrice: null,
-    stockQty: 18,
-    restockThreshold: 5,
-    shipping: { weightKg: 0.24, lengthCm: 8, widthCm: 8, heightCm: 6, fee: 60 },
-    photos: [
-      "https://picsum.photos/seed/hydra2/640/400",
-      "https://picsum.photos/seed/hydra2b/640/400",
-      "https://picsum.photos/seed/hydra2c/640/400",
-    ],
-  },
-  {
-    id: "P-3001",
-    categoryId: "c6a87cd6d6d9444ab54a44b690112233",
-    name: "淨痘調理精華 30ml",
-    description: "水楊酸與鋅調理油水平衡，改善粉刺痘痘。",
-    regularPrice: 980,
-    salePrice: 899,
-    stockQty: 12,
-    restockThreshold: 4,
-    shipping: { weightKg: 0.15, lengthCm: 12, widthCm: 4, heightCm: 4, fee: 60 },
-    photos: [
-      "https://picsum.photos/seed/acne1/640/400",
-      "https://picsum.photos/seed/acne1b/640/400",
-    ],
-  },
-  {
-    id: "P-3002",
-    categoryId: "c6a87cd6d6d9444ab54a44b690112233",
-    name: "清爽控油凝膠 40ml",
-    description: "輕盈不悶，長效控油與舒緩泛紅。",
-    regularPrice: 880,
-    salePrice: null,
-    stockQty: 20,
-    restockThreshold: 5,
-    shipping: { weightKg: 0.12, lengthCm: 10, widthCm: 4, heightCm: 4, fee: 60 },
-    photos: ["https://picsum.photos/seed/acne2/640/400"],
-  },
-];
-
-// -------------------- Utils --------------------
+// ---------- utils ----------
 const priceTWD = (n) => `NT$ ${Number(n || 0).toLocaleString("zh-TW")}`;
 
-// -------------------- Product Modal (view + edit) --------------------
+// ---------- Modal (view + edit) ----------
 function ProductModal({ product, onSave, onClose }) {
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState(() => JSON.parse(JSON.stringify(product)));
@@ -130,23 +32,23 @@ function ProductModal({ product, onSave, onClose }) {
   const onFiles = (files) => {
     const arr = Array.from(files || []);
     if (arr.length === 0) return;
+    // NOTE: Preview upload only. Replace with real upload (S3) later and set URLs.
     const urls = arr.map((f) => URL.createObjectURL(f));
     setForm((prev) => ({ ...prev, photos: [...(prev.photos || []), ...urls] }));
   };
 
   const removePhoto = (idx) =>
-    setForm((prev) => ({
-      ...prev,
-      photos: prev.photos.filter((_, i) => i !== idx),
-    }));
+    setForm((prev) => ({ ...prev, photos: prev.photos.filter((_, i) => i !== idx) }));
 
   const canSave =
     form.name?.trim() &&
-    Number(form.regularPrice) >= 0 &&
-    (form.salePrice == null || form.salePrice === "" || Number(form.salePrice) >= 0);
+    Number.isFinite(Number(form.regularPrice)) &&
+    (form.salePrice == null || form.salePrice === "" || Number.isFinite(Number(form.salePrice)));
 
   const effectivePrice =
-    form.salePrice != null && form.salePrice !== "" && Number(form.salePrice) < Number(form.regularPrice)
+    form.salePrice != null &&
+      form.salePrice !== "" &&
+      Number(form.salePrice) < Number(form.regularPrice)
       ? Number(form.salePrice)
       : Number(form.regularPrice);
 
@@ -155,7 +57,8 @@ function ProductModal({ product, onSave, onClose }) {
       <div className="pp-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <header className="pp-modal-header">
           <div className="pp-modal-title">
-            {isEditing ? "編輯商品" : "商品詳情"}：{product.name} <span className="pp-muted">#{product.id}</span>
+            {isEditing ? "編輯商品" : "商品詳情"}：{product.name}{" "}
+            <span className="pp-muted">#{product.product_id}</span>
           </div>
           <div className="pp-actions">
             {!isEditing ? (
@@ -180,7 +83,7 @@ function ProductModal({ product, onSave, onClose }) {
         </header>
 
         <div className="pp-modal-body">
-          {/* Left: image & thumbs */}
+          {/* Left: gallery */}
           <div className="pp-hero">
             <div className="pp-thumb main">
               <img
@@ -190,9 +93,11 @@ function ProductModal({ product, onSave, onClose }) {
             </div>
 
             <div className="pp-thumbs">
-              {(isEditing ? form.photos : product.photos).map((src, i) => (
+              {(isEditing ? form.photos : product.photos)?.map((src, i) => (
                 <div key={`${src}-${i}`} className={`pp-thumb-btn ${i === activeIdx ? "active" : ""}`}>
-                  <button className="pp-thumb-close" onClick={() => isEditing ? removePhoto(i) : setActiveIdx(i)} title={isEditing ? "移除圖片" : "查看圖片"}>×</button>
+                  {isEditing ? (
+                    <button className="pp-thumb-close" onClick={() => removePhoto(i)} title="移除圖片">×</button>
+                  ) : null}
                   <button className="pp-thumb-click" onClick={() => setActiveIdx(i)}>
                     <img src={src} alt={`縮圖 ${i + 1}`} />
                   </button>
@@ -216,30 +121,44 @@ function ProductModal({ product, onSave, onClose }) {
           {/* Right: info or form */}
           {!isEditing ? (
             <div className="pp-details">
-              <div className="pp-detail-row"><span className="pp-detail-label">標題：</span>{product.name}</div>
-              <div className="pp-detail-row"><span className="pp-detail-label">分類ID：</span>{product.categoryId}</div>
+              <div className="pp-detail-row">
+                <span className="pp-detail-label">標題：</span>{product.name}
+              </div>
+              <div className="pp-detail-row">
+                <span className="pp-detail-label">分類：</span>
+                {product.category?.category_name ?? "未分類"}（{product.category_id}）
+              </div>
               <div className="pp-detail-row">
                 <span className="pp-detail-label">價格：</span>
-                <span>
-                  {product.salePrice && product.salePrice < product.regularPrice ? (
-                    <>
-                      <span className="pp-price-sale">{priceTWD(product.salePrice)}</span>
-                      <span className="pp-price-strike">{priceTWD(product.regularPrice)}</span>
-                    </>
-                  ) : (
-                    <span className="pp-price">{priceTWD(product.regularPrice)}</span>
-                  )}
-                </span>
+                {product.salePrice && product.salePrice < product.regularPrice ? (
+                  <>
+                    <span className="pp-price-sale">{priceTWD(product.salePrice)}</span>
+                    <span className="pp-price-strike">{priceTWD(product.regularPrice)}</span>
+                  </>
+                ) : (
+                  <span className="pp-price">{priceTWD(product.regularPrice)}</span>
+                )}
               </div>
-              <div className="pp-detail-row"><span className="pp-detail-label">庫存：</span>{product.stockQty}（提醒門檻 {product.restockThreshold}）</div>
+              <div className="pp-detail-row">
+                <span className="pp-detail-label">庫存：</span>
+                {product.stockQty}（提醒門檻 {product.restockThreshold}）
+              </div>
               <div className="pp-detail-row">
                 <span className="pp-detail-label">運送：</span>
-                {product.shipping.weightKg}kg，{product.shipping.lengthCm}×{product.shipping.widthCm}×{product.shipping.heightCm}cm，費用 {priceTWD(product.shipping.fee)}
+                {product.shipping?.weightKg ?? 0}kg，{product.shipping?.lengthCm ?? 0}×
+                {product.shipping?.widthCm ?? 0}×{product.shipping?.heightCm ?? 0}cm，
+                費用 {priceTWD(product.shipping?.fee ?? 0)}
               </div>
               <p className="pp-desc">{product.description}</p>
             </div>
           ) : (
-            <form className="pp-form" onSubmit={(e) => { e.preventDefault(); if (canSave) onSave(form); }}>
+            <form
+              className="pp-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (canSave) onSave(form);
+              }}
+            >
               {/* Basic */}
               <fieldset className="pp-fieldset">
                 <legend>基本資訊</legend>
@@ -272,9 +191,7 @@ function ProductModal({ product, onSave, onClose }) {
                   <label className="pp-field">
                     <span className="pp-label">原價（Regular price）</span>
                     <input
-                      type="number"
-                      min="0"
-                      step="1"
+                      type="number" min="0" step="1"
                       className="pp-input"
                       value={form.regularPrice}
                       onChange={(e) => setField("regularPrice", e.target.valueAsNumber || 0)}
@@ -283,9 +200,7 @@ function ProductModal({ product, onSave, onClose }) {
                   <label className="pp-field">
                     <span className="pp-label">特價（Sale price）</span>
                     <input
-                      type="number"
-                      min="0"
-                      step="1"
+                      type="number" min="0" step="1"
                       className="pp-input"
                       value={form.salePrice ?? ""}
                       onChange={(e) => setField("salePrice", e.target.value === "" ? null : (e.target.valueAsNumber || 0))}
@@ -303,9 +218,7 @@ function ProductModal({ product, onSave, onClose }) {
                   <label className="pp-field">
                     <span className="pp-label">庫存數量</span>
                     <input
-                      type="number"
-                      min="0"
-                      step="1"
+                      type="number" min="0" step="1"
                       className="pp-input"
                       value={form.stockQty}
                       onChange={(e) => setField("stockQty", e.target.valueAsNumber || 0)}
@@ -314,9 +227,7 @@ function ProductModal({ product, onSave, onClose }) {
                   <label className="pp-field">
                     <span className="pp-label">補貨門檻</span>
                     <input
-                      type="number"
-                      min="0"
-                      step="1"
+                      type="number" min="0" step="1"
                       className="pp-input"
                       value={form.restockThreshold}
                       onChange={(e) => setField("restockThreshold", e.target.valueAsNumber || 0)}
@@ -338,7 +249,7 @@ function ProductModal({ product, onSave, onClose }) {
                     <input
                       type="number" step="0.01" min="0"
                       className="pp-input"
-                      value={form.shipping.weightKg}
+                      value={form.shipping?.weightKg ?? 0}
                       onChange={(e) => setField("shipping.weightKg", e.target.valueAsNumber || 0)}
                     />
                   </label>
@@ -347,7 +258,7 @@ function ProductModal({ product, onSave, onClose }) {
                     <input
                       type="number" step="0.1" min="0"
                       className="pp-input"
-                      value={form.shipping.lengthCm}
+                      value={form.shipping?.lengthCm ?? 0}
                       onChange={(e) => setField("shipping.lengthCm", e.target.valueAsNumber || 0)}
                     />
                   </label>
@@ -356,7 +267,7 @@ function ProductModal({ product, onSave, onClose }) {
                     <input
                       type="number" step="0.1" min="0"
                       className="pp-input"
-                      value={form.shipping.widthCm}
+                      value={form.shipping?.widthCm ?? 0}
                       onChange={(e) => setField("shipping.widthCm", e.target.valueAsNumber || 0)}
                     />
                   </label>
@@ -365,7 +276,7 @@ function ProductModal({ product, onSave, onClose }) {
                     <input
                       type="number" step="0.1" min="0"
                       className="pp-input"
-                      value={form.shipping.heightCm}
+                      value={form.shipping?.heightCm ?? 0}
                       onChange={(e) => setField("shipping.heightCm", e.target.valueAsNumber || 0)}
                     />
                   </label>
@@ -375,7 +286,7 @@ function ProductModal({ product, onSave, onClose }) {
                   <input
                     type="number" step="1" min="0"
                     className="pp-input"
-                    value={form.shipping.fee}
+                    value={form.shipping?.fee ?? 0}
                     onChange={(e) => setField("shipping.fee", e.target.valueAsNumber || 0)}
                   />
                 </label>
@@ -388,46 +299,89 @@ function ProductModal({ product, onSave, onClose }) {
   );
 }
 
-// -------------------- Main: collapsible categories + modal --------------------
-export default function ProductsByCategory() {
-  const [expandedIds, setExpandedIds] = useState(() => new Set());
+// ---------- Page (collapsible categories + modal, data from API) ----------
+export default function Settings() {
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [products, setProducts] = useState([]); // API items
+  const [expandedIds, setExpandedIds] = useState(() => new Set()); // category ids
   const [searchId, setSearchId] = useState("");
-  const [products, setProducts] = useState(SEED_PRODUCTS);
-  const [selected, setSelected] = useState(null); // product object
+  const [selected, setSelected] = useState(null); // selected product (API shape)
 
-  const productsByCategory = useMemo(() => {
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await getAllProducts(); // { count, items: [...] }
+        // Normalize a bit for UI convenience
+        const items = Array.isArray(resp?.items) ? resp.items : [];
+        setProducts(items);
+      } catch (e) {
+        console.error("Failed to load products:", e);
+        setErr(e?.message || "載入失敗");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  // Build category list from products
+  const categories = useMemo(() => {
+    // Deduplicate categories by category_id (fallback to "uncategorized")
     const map = new Map();
-    for (const c of CATEGORIES) map.set(c.id, []);
     for (const p of products) {
-      if (!map.has(p.categoryId)) map.set(p.categoryId, []);
-      map.get(p.categoryId).push(p);
+      const id = p.category_id || "uncategorized";
+      const name = p.category?.category_name || "未分類";
+      if (!map.has(id)) {
+        map.set(id, { id, name });
+      }
     }
-    for (const arr of map.values()) arr.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
-    return map;
+    // Stable order by name
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
   }, [products]);
+
+  // Group products by category id
+  const productsByCategory = useMemo(() => {
+    const m = new Map(categories.map((c) => [c.id, []]));
+    for (const p of products) {
+      const id = p.category_id || "uncategorized";
+      if (!m.has(id)) m.set(id, []);
+      m.get(id).push(p);
+    }
+    // Optional: sort within category by name
+    for (const arr of m.values()) arr.sort((a, b) => (a.name || "").localeCompare(b.name || "", "zh-Hant"));
+    return m;
+  }, [products, categories]);
 
   const filteredCategories = useMemo(() => {
     const q = searchId.trim().toLowerCase();
-    if (!q) return CATEGORIES;
-    return CATEGORIES.filter((c) => c.id.toLowerCase().includes(q));
-  }, [searchId]);
+    if (!q) return categories;
+    return categories.filter((c) => c.id.toLowerCase().includes(q));
+  }, [categories, searchId]);
 
-  const toggleCategory = (id) => {
+  const toggleCategory = useCallback((id) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  };
+  }, []);
 
   const onSaveProduct = (next) => {
-    setProducts((prev) => prev.map((p) => (p.id === next.id ? next : p)));
+    // TODO: wire to PATCH /products/edit-product if/when available.
+    setProducts((prev) => prev.map((p) => (p.product_id === next.product_id ? next : p)));
     setSelected(next); // keep modal open with updated data
   };
 
+  if (loading) {
+    return <div className="pp-container">載入中…</div>;
+  }
+  if (err) {
+    return <div className="pp-container">讀取失敗：{err}</div>;
+  }
+
   return (
     <div className="pp-container">
-      <div className="pp-header">商品管理（可收合分類＋管理表單）</div>
+      <div className="pp-header">商品管理（來自 API /products/get-all-products）</div>
 
       <div className="pp-toolbar">
         <input
@@ -436,8 +390,15 @@ export default function ProductsByCategory() {
           value={searchId}
           onChange={(e) => setSearchId(e.target.value)}
         />
-        <button className="pp-btn ghost" onClick={() => setExpandedIds(new Set(filteredCategories.map((c) => c.id)))}>全部展開</button>
-        <button className="pp-btn ghost" onClick={() => setExpandedIds(new Set())}>全部收合</button>
+        <button
+          className="pp-btn ghost"
+          onClick={() => setExpandedIds(new Set(filteredCategories.map((c) => c.id)))}
+        >
+          全部展開
+        </button>
+        <button className="pp-btn ghost" onClick={() => setExpandedIds(new Set())}>
+          全部收合
+        </button>
       </div>
 
       <div className="pp-accordion">
@@ -461,7 +422,7 @@ export default function ProductsByCategory() {
                     <div className="pp-grid">
                       {list.map((p) => (
                         <article
-                          key={p.id}
+                          key={p.product_id}
                           className="pp-card"
                           onClick={() => setSelected(p)}
                           role="button"
@@ -474,6 +435,16 @@ export default function ProductsByCategory() {
                           </div>
                           <div className="pp-card-body">
                             <div className="pp-product-name">{p.name}</div>
+
+                            {Array.isArray(p.photos) && p.photos.length > 1 && (
+                              <div className="pp-mini-thumbs">
+                                {(p.photos.slice(0, 3)).map((src, i) => (
+                                  <img key={src + i} src={src} loading="lazy" alt={`縮圖 ${i + 1}`} />
+                                ))}
+                                {p.photos.length > 3 && <span className="pp-more">+{p.photos.length - 3}</span>}
+                              </div>
+                            )}
+
                             <div className="pp-price">
                               {p.salePrice && p.salePrice < p.regularPrice ? (
                                 <>
@@ -485,6 +456,7 @@ export default function ProductsByCategory() {
                               )}
                             </div>
                           </div>
+
                         </article>
                       ))}
                     </div>

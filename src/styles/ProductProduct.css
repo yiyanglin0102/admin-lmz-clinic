@@ -120,3 +120,6 @@
 .pp-inline { display: flex; gap: 8px; align-items: center; }
 .pp-hint { color: #374151; margin-top: 4px; }
 .pp-price { font-weight: 600; color: #111827; }
+.pp-mini-thumbs { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.pp-mini-thumbs img { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; border: 1px solid #e5e7eb; }
+.pp-more { font-size: 12px; color: #6b7280; }
