@@ -22,6 +22,9 @@ async function apiFetch(path, { method = "GET", body, headers } = {}) {
   return data;
 }
 
-export function getAllProducts() {
-  return apiFetch("/products/get-all-products");
+// src/services/products.js
+export function getAllProducts(categoryId) {
+  const qs = categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : "";
+  return apiFetch(`/products/get-all-products${qs}`);
 }
+
