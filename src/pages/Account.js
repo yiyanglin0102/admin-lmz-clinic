@@ -3,48 +3,8 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import "../styles/Account.css";
 import LoginActivity from "../components/LoginActivity";
 import { getProfile, patchProfile, listSessions } from "../services/account";
-
-const API_BASE = "https://3srgkiu0yl.execute-api.ap-southeast-1.amazonaws.com";
-
-// Avatar now supports srcOverride: if provided, it displays that directly
-function Avatar({ keyPath, srcOverride }) {
-  const [src, setSrc] = useState("");
-  const [err, setErr] = useState("");
-
-  const refresh = useCallback(async () => {
-    // If an override is provided (blob URL or signed URL), just use it.
-    if (srcOverride) {
-      setErr("");
-      setSrc(srcOverride);
-      return;
-    }
-    // Otherwise fetch via keyPath
-    if (!keyPath) { setSrc(""); return; }
-    try {
-      setErr("");
-      const res = await fetch(
-        `${API_BASE}/getViewUrl?key=${encodeURIComponent(keyPath)}`,
-        { mode: "cors" }
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || res.statusText);
-      if (!data?.url) throw new Error("No URL returned");
-      setSrc(data.url);
-    } catch (e) {
-      setErr(String(e));
-      setSrc("");
-    }
-  }, [keyPath, srcOverride]);
-
-  useEffect(() => { refresh(); }, [refresh]);
-
-  return (
-    <div>
-      {src ? <img src={src} alt="avatar" className="avatar" /> : <div className="avatar placeholder" />}
-      {err && <div style={{ color: "crimson", marginTop: 6, fontSize: 12 }}>{err}</div>}
-    </div>
-  );
-}
+import { getUploadUrl, getViewUrl, putWithProgress } from "../services/storage";
+import { useSignedImage } from "../components/hook/useSignedImage";
 
 const MAX_MB = 8;
 const ACCEPT = "image/png,image/jpeg,image/webp";
@@ -61,7 +21,7 @@ const DEFAULT_PROFILE = {
   locale: "zh-TW",
   timeZone: "Asia/Taipei",
   region: "TW",
-  currency: "TWD"
+  currency: "TWD",
 };
 
 /** Map whatever backend returns into the canonical UI shape */
@@ -74,17 +34,28 @@ function normalizeProfile(raw) {
     avatarKey: r.avatarKey || r.avatar || "",
     createdAt: r.createdAt || r.created_at || r.created || "",
     role: r.role || r.userRole || "User",
-    twoFactor: Boolean(
-      r.twoFactor ??
-      r.mfaEnabled ??
-      r.totpEnabled ??
-      r.has2FA
-    ),
+    twoFactor: Boolean(r.twoFactor ?? r.mfaEnabled ?? r.totpEnabled ?? r.has2FA),
     locale: r.locale || r.buyer_locale || r.language || "zh-TW",
     timeZone: r.timeZone || r.timezone || "Asia/Taipei",
     region: r.region || "TW",
-    currency: r.currency || r.display_currency || "TWD"
+    currency: r.currency || r.display_currency || "TWD",
   };
+}
+
+/** Avatar renders:
+ * - srcOverride if provided (blob or signed URL)
+ * - otherwise resolves keyPath via useSignedImage (signed or blob)
+ */
+function Avatar({ keyPath, srcOverride }) {
+  const { src: signedSrc, error } = useSignedImage(keyPath, { preferBlob: false });
+  const src = srcOverride || signedSrc;
+
+  return (
+    <div>
+      {src ? <img src={src} alt="avatar" className="avatar" /> : <div className="avatar placeholder" />}
+      {error && <div style={{ color: "crimson", marginTop: 6, fontSize: 12 }}>{error}</div>}
+    </div>
+  );
 }
 
 const Account = () => {
@@ -100,7 +71,7 @@ const Account = () => {
 
   // After uploading to S3 (but before save), we hold a PENDING key + preview src
   const [pendingAvatarKey, setPendingAvatarKey] = useState("");
-  const [pendingAvatarSrc, setPendingAvatarSrc] = useState(""); // signed URL (or we can keep blob)
+  const [pendingAvatarSrc, setPendingAvatarSrc] = useState(""); // signed URL (or blob if fallback)
 
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -135,7 +106,6 @@ const Account = () => {
 
   const cancelDraft = () => {
     setDraftFile(null);
-    // Don't revoke if the pending preview is still using this blob
     if (draftPreview && pendingAvatarSrc !== draftPreview) {
       URL.revokeObjectURL(draftPreview);
     }
@@ -143,7 +113,6 @@ const Account = () => {
     setProgress(0);
     clearFileInput();
   };
-
 
   // Revert the staged avatar change (if user uploaded to S3 but didn't save)
   const revertPendingPhoto = () => {
@@ -158,54 +127,28 @@ const Account = () => {
     setUploading(true);
     setProgress(0);
     try {
-      const r1 = await fetch(`${API_BASE}/getUploadUrl`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentType: draftFile.type })
-      });
-      const { uploadUrl, key } = await r1.json();
-      if (!r1.ok || !uploadUrl || !key) throw new Error("Failed to get upload URL");
+      const { uploadUrl, key } = await getUploadUrl(draftFile.type);
+      if (!uploadUrl || !key) throw new Error("Failed to get upload URL");
 
       await putWithProgress(uploadUrl, draftFile, draftFile.type, (p) => setProgress(p));
 
       // Get a signed view URL for the pending key so preview remains after we close draft
       try {
-        const v = await fetch(
-          `${API_BASE}/getViewUrl?key=${encodeURIComponent(key)}`,
-          { mode: "cors" }
-        );
-        const data = await v.json();
-        if (!v.ok || !data?.url) throw new Error("Failed to get view URL for pending avatar");
-        setPendingAvatarSrc(data.url);
-      } catch (e) {
+        const url = await getViewUrl(key);
+        setPendingAvatarSrc(url);
+      } catch {
         // Fallback: if we can't fetch a view URL, keep the local blob preview
         setPendingAvatarSrc(draftPreview);
       }
 
-      setPendingAvatarKey(key); // <-- staged; not saved yet
-      // Close the draft UI; keep pending states
-      cancelDraft();
+      setPendingAvatarKey(key); // staged; not saved yet
+      cancelDraft(); // close draft UI
     } catch (err) {
       alert(`Upload error: ${err}`);
     } finally {
       setUploading(false);
     }
   };
-
-  const putWithProgress = (url, file, contentType, onProgress) =>
-    new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", url, true);
-      xhr.setRequestHeader("Content-Type", contentType);
-      xhr.upload.onprogress = (e) => {
-        if (!e.lengthComputable) return;
-        onProgress(Math.round((e.loaded / e.total) * 100));
-      };
-      xhr.onload = () =>
-        (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error(`S3 PUT ${xhr.status}`));
-      xhr.onerror = () => reject(new Error("Network error"));
-      xhr.send(file);
-    });
 
   // Persist to DB ONLY here
   const save = async () => {
@@ -215,8 +158,7 @@ const Account = () => {
     try {
       const payload = {
         displayName,
-        // If a new pending avatar was staged, persist that; otherwise keep current.
-        avatarKey: pendingAvatarKey || profile.avatarKey
+        avatarKey: pendingAvatarKey || profile.avatarKey,
       };
       const updated = await patchProfile(payload);
 
@@ -226,11 +168,15 @@ const Account = () => {
         setDisplayName(norm.displayName || "");
       } else {
         // Merge locally if API doesn't return updated profile
-        setProfile(prev => prev ? {
-          ...prev,
-          displayName,
-          avatarKey: pendingAvatarKey || prev.avatarKey
-        } : prev);
+        setProfile((prev) =>
+          prev
+            ? {
+                ...prev,
+                displayName,
+                avatarKey: pendingAvatarKey || prev.avatarKey,
+              }
+            : prev
+        );
       }
 
       // Commit finished — clear pending state
@@ -246,21 +192,36 @@ const Account = () => {
     }
   };
 
-  const changePassword = async () => { console.log("Changing password..."); };
-  const enable2FA = async () => { console.log("Enabling 2FA..."); };
-  const disable2FA = async () => { console.log("Disabling 2FA..."); };
-  const logOutAllDevices = async () => { console.log("Logging out from all devices..."); };
-  const editRecoveryEmail = async () => { console.log("Recovering email..."); };
-  const editRecoveryPhone = async () => { console.log("Recovering phone..."); };
-  const deleteAccount = async () => { console.log("Deleting account..."); };
-  const exportAccountData = async () => { console.log("Exporting account data..."); };
+  const changePassword = async () => {
+    console.log("Changing password...");
+  };
+  const enable2FA = async () => {
+    console.log("Enabling 2FA...");
+  };
+  const disable2FA = async () => {
+    console.log("Disabling 2FA...");
+  };
+  const logOutAllDevices = async () => {
+    console.log("Logging out from all devices...");
+  };
+  const editRecoveryEmail = async () => {
+    console.log("Recovering email...");
+  };
+  const editRecoveryPhone = async () => {
+    console.log("Recovering phone...");
+  };
+  const deleteAccount = async () => {
+    console.log("Deleting account...");
+  };
+  const exportAccountData = async () => {
+    console.log("Exporting account data...");
+  };
 
   // Load profile
   useEffect(() => {
     (async () => {
       try {
         const data = await getProfile();
-        // console.log("GET /me/profile response:", data);
         const norm = normalizeProfile(data);
         setProfile(norm);
         setDisplayName(norm.displayName || "");
@@ -270,10 +231,10 @@ const Account = () => {
       }
     })();
   }, []);
-  // Load sessions once (supports optional DEV mock)
+
+  // Load sessions once
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
       try {
         const resp = await listSessions();
@@ -284,10 +245,10 @@ const Account = () => {
         if (!cancelled) setSessions([]);
       }
     })();
-
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
 
   const isActive = (s) => {
     if (s.revokedAt) return false;
@@ -295,10 +256,9 @@ const Account = () => {
     const mins = (Date.now() - new Date(s.lastSeenAt).getTime()) / 60000;
     return mins <= 5;
   };
-
   const activeCount = sessions.filter(isActive).length;
 
-  // Decide what to display in the avatar slot:
+  // What to display in the avatar slot:
   // - If user picked a file but hasn't uploaded to S3 yet -> draftPreview (blob)
   // - Else if we uploaded to S3 but haven't saved -> pendingAvatarSrc (signed or blob)
   // - Else show the persisted avatar via keyPath
@@ -310,9 +270,6 @@ const Account = () => {
         <h1 className="account-title">Account</h1>
         <p className="account-subtitle">Manage your profile and security.</p>
       </header>
-
-      {/* Debug (optional) */}
-      {/* <pre style={{ fontSize: 12 }}>{JSON.stringify({ profile, pendingAvatarKey }, null, 2)}</pre> */}
 
       {/* Profile */}
       <section className="card">
@@ -333,12 +290,16 @@ const Account = () => {
             </div>
 
             <p>
-              <strong>Email:</strong>{" "}
-              {profile?.email || "—"} <span className="ok">Verified</span>
+              <strong>Email:</strong> {profile?.email || "—"} <span className="ok">Verified</span>
             </p>
-            <p><strong>Role:</strong> {profile?.role || "User"}</p>
+            <p>
+              <strong>Role:</strong> {profile?.role || "User"}
+            </p>
 
-            <div className="profile-actions" style={{ gap: 8, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+            <div
+              className="profile-actions"
+              style={{ gap: 8, display: "flex", alignItems: "center", flexWrap: "wrap" }}
+            >
               <button className="btn primary" onClick={pickFile} disabled={!profileLoaded}>
                 Change profile picture
               </button>
@@ -350,14 +311,13 @@ const Account = () => {
                 onChange={onPickFile}
               />
 
-              {/* If a staged (pending) avatar exists, let user revert it */}
               {pendingAvatarKey && (
-                <button className="btn ghost" onClick={revertPendingPhoto}>
-                  Revert photo change
-                </button>
-              )}
-              {pendingAvatarKey && (
-                <span className="badge">Pending photo</span>
+                <>
+                  <button className="btn ghost" onClick={revertPendingPhoto}>
+                    Revert photo change
+                  </button>
+                  <span className="badge">Pending photo</span>
+                </>
               )}
             </div>
 
@@ -375,15 +335,18 @@ const Account = () => {
                       </div>
                     ) : (
                       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <button className="btn primary" onClick={confirmUpload}>Upload</button>
-                        <button className="btn ghost" onClick={cancelDraft}>Cancel</button>
+                        <button className="btn primary" onClick={confirmUpload}>
+                          Upload
+                        </button>
+                        <button className="btn ghost" onClick={cancelDraft}>
+                          Cancel
+                        </button>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
             )}
-
           </div>
         </div>
       </section>
@@ -396,7 +359,9 @@ const Account = () => {
             <label className="label">Password</label>
             <div className="inline">
               <span>●●●●●●●●</span>
-              <button className="btn ghost sm" onClick={changePassword}>Change password</button>
+              <button className="btn ghost sm" onClick={changePassword}>
+                Change password
+              </button>
             </div>
           </div>
 
@@ -404,8 +369,12 @@ const Account = () => {
             <label className="label">Two-Factor Authentication (2FA)</label>
             <div className="inline">
               <span>{profile?.twoFactor ? "Enabled" : "Disabled"}</span>
-              <button className="btn ghost sm" onClick={enable2FA} disabled={profile?.twoFactor}>Enable 2FA</button>
-              <button className="btn ghost sm" onClick={disable2FA} disabled={!profile?.twoFactor}>Disable 2FA</button>
+              <button className="btn ghost sm" onClick={enable2FA} disabled={profile?.twoFactor}>
+                Enable 2FA
+              </button>
+              <button className="btn ghost sm" onClick={disable2FA} disabled={!profile?.twoFactor}>
+                Disable 2FA
+              </button>
             </div>
           </div>
 
@@ -413,7 +382,9 @@ const Account = () => {
             <label className="label">Active sessions</label>
             <div className="inline">
               <span>{activeCount} devices signed in</span>
-              <button className="btn ghost sm" onClick={logOutAllDevices}>Log out of all devices</button>
+              <button className="btn ghost sm" onClick={logOutAllDevices}>
+                Log out of all devices
+              </button>
             </div>
           </div>
         </div>
@@ -430,14 +401,18 @@ const Account = () => {
             <label className="label">Recovery email</label>
             <div className="inline">
               <span>recovery@example.com</span>
-              <button className="btn ghost sm" onClick={editRecoveryEmail}>Edit</button>
+              <button className="btn ghost sm" onClick={editRecoveryEmail}>
+                Edit
+              </button>
             </div>
           </div>
           <div className="field">
             <label className="label">Recovery phone</label>
             <div className="inline">
               <span>+886 912 345 678</span>
-              <button className="btn ghost sm" onClick={editRecoveryPhone}>Edit</button>
+              <button className="btn ghost sm" onClick={editRecoveryPhone}>
+                Edit
+              </button>
             </div>
           </div>
         </div>
@@ -451,19 +426,25 @@ const Account = () => {
             <h3>Export account data</h3>
             <p className="hint">Download your account profile and settings.</p>
           </div>
-          <button className="btn ghost" onClick={exportAccountData}>Export</button>
+          <button className="btn ghost" onClick={exportAccountData}>
+            Export
+          </button>
         </div>
         <div className="danger-row">
           <div>
             <h3>Delete account</h3>
             <p className="hint">This action is permanent and cannot be undone.</p>
           </div>
-          <button className="btn danger" onClick={deleteAccount}>Delete</button>
+          <button className="btn danger" onClick={deleteAccount}>
+            Delete
+          </button>
         </div>
       </section>
 
       <footer className="actions">
-        <button className="btn ghost" onClick={() => window.location.reload()}>Reset</button>
+        <button className="btn ghost" onClick={() => window.location.reload()}>
+          Reset
+        </button>
         <button className="btn primary" onClick={save} disabled={saving || !profileLoaded}>
           {saving ? "Saving..." : "Save changes"}
         </button>

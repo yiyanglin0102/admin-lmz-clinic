@@ -1,9 +1,29 @@
+// src/pages/ProductProduct.js
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import "../styles/ProductProduct.css";
 import { getAllProducts } from "../services/products";
+import { useSignedImage } from "../components/hook/useSignedImage";
+import { getPhotoKeysOrUrls } from "../components/utils/photos";
 
 // ---------- utils ----------
 const priceTWD = (n) => `NT$ ${Number(n || 0).toLocaleString("zh-TW")}`;
+const PLACEHOLDER =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="50%" font-family="sans-serif" font-size="18" text-anchor="middle" fill="%2399a"><tspan dy=".3em">No image</tspan></text></svg>';
+
+// ---------- S3Image: resolves S3 key or URL via hook ----------
+function S3Image({ keyOrUrl, alt = "", className, preferBlob = true, imgProps = {} }) {
+  const { src, error } = useSignedImage(keyOrUrl, { preferBlob });
+  if (!src) {
+    return (
+      <div
+        className={`pp-img ph ${className || ""}`}
+        aria-label={error ? `image error: ${error}` : "image placeholder"}
+        title={error || "loading..."}
+      />
+    );
+  }
+  return <img src={src} alt={alt} className={className} {...imgProps} />;
+}
 
 // ---------- Modal (view + edit) ----------
 function ProductModal({ product, onSave, onClose }) {
@@ -29,10 +49,15 @@ function ProductModal({ product, onSave, onClose }) {
     });
   };
 
+  // Photos for display:
+  const viewPhotos = useMemo(() => getPhotoKeysOrUrls(product), [product]);
+  const editPhotos = Array.isArray(form.photos) ? form.photos : [];
+  const displayPhotos = isEditing ? editPhotos : viewPhotos;
+
   const onFiles = (files) => {
     const arr = Array.from(files || []);
-    if (arr.length === 0) return;
-    // NOTE: Preview upload only. Replace with real upload (S3) later and set URLs.
+    if (!arr.length) return;
+    // Preview only; wire to S3 upload later if needed
     const urls = arr.map((f) => URL.createObjectURL(f));
     setForm((prev) => ({ ...prev, photos: [...(prev.photos || []), ...urls] }));
   };
@@ -47,8 +72,8 @@ function ProductModal({ product, onSave, onClose }) {
 
   const effectivePrice =
     form.salePrice != null &&
-      form.salePrice !== "" &&
-      Number(form.salePrice) < Number(form.regularPrice)
+    form.salePrice !== "" &&
+    Number(form.salePrice) < Number(form.regularPrice)
       ? Number(form.salePrice)
       : Number(form.regularPrice);
 
@@ -86,20 +111,41 @@ function ProductModal({ product, onSave, onClose }) {
           {/* Left: gallery */}
           <div className="pp-hero">
             <div className="pp-thumb main">
-              <img
-                src={(isEditing ? form.photos : product.photos)?.[activeIdx]}
-                alt={`${product.name} 圖片`}
-              />
+              {displayPhotos[activeIdx] ? (
+                isEditing && /^blob:/.test(displayPhotos[activeIdx]) ? (
+                  <img src={displayPhotos[activeIdx]} alt={`${product.name} 圖片`} />
+                ) : (
+                  <S3Image
+                    keyOrUrl={displayPhotos[activeIdx]}
+                    alt={`${product.name} 圖片`}
+                    className="pp-img"
+                    preferBlob={true}
+                    imgProps={{ loading: "eager" }}
+                  />
+                )
+              ) : (
+                <img src={PLACEHOLDER} alt="placeholder" />
+              )}
             </div>
 
             <div className="pp-thumbs">
-              {(isEditing ? form.photos : product.photos)?.map((src, i) => (
+              {displayPhotos.map((src, i) => (
                 <div key={`${src}-${i}`} className={`pp-thumb-btn ${i === activeIdx ? "active" : ""}`}>
-                  {isEditing ? (
+                  {isEditing && /^blob:/.test(src) ? (
                     <button className="pp-thumb-close" onClick={() => removePhoto(i)} title="移除圖片">×</button>
                   ) : null}
                   <button className="pp-thumb-click" onClick={() => setActiveIdx(i)}>
-                    <img src={src} alt={`縮圖 ${i + 1}`} />
+                    {isEditing && /^blob:/.test(src) ? (
+                      <img src={src} alt={`縮圖 ${i + 1}`} />
+                    ) : (
+                      <S3Image
+                        keyOrUrl={src}
+                        alt={`縮圖 ${i + 1}`}
+                        className="pp-img"
+                        preferBlob={false}
+                        imgProps={{ loading: "lazy" }}
+                      />
+                    )}
                   </button>
                 </div>
               ))}
@@ -300,7 +346,7 @@ function ProductModal({ product, onSave, onClose }) {
 }
 
 // ---------- Page (collapsible categories + modal, data from API) ----------
-export default function Settings() {
+export default function ProductProduct() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [products, setProducts] = useState([]); // API items
@@ -312,7 +358,6 @@ export default function Settings() {
     (async () => {
       try {
         const resp = await getAllProducts(); // { count, items: [...] }
-        // Normalize a bit for UI convenience
         const items = Array.isArray(resp?.items) ? resp.items : [];
         setProducts(items);
       } catch (e) {
@@ -324,18 +369,14 @@ export default function Settings() {
     })();
   }, []);
 
-  // Build category list from products
+  // Build categories from products
   const categories = useMemo(() => {
-    // Deduplicate categories by category_id (fallback to "uncategorized")
     const map = new Map();
     for (const p of products) {
       const id = p.category_id || "uncategorized";
       const name = p.category?.category_name || "未分類";
-      if (!map.has(id)) {
-        map.set(id, { id, name });
-      }
+      if (!map.has(id)) map.set(id, { id, name });
     }
-    // Stable order by name
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
   }, [products]);
 
@@ -347,7 +388,6 @@ export default function Settings() {
       if (!m.has(id)) m.set(id, []);
       m.get(id).push(p);
     }
-    // Optional: sort within category by name
     for (const arr of m.values()) arr.sort((a, b) => (a.name || "").localeCompare(b.name || "", "zh-Hant"));
     return m;
   }, [products, categories]);
@@ -367,21 +407,17 @@ export default function Settings() {
   }, []);
 
   const onSaveProduct = (next) => {
-    // TODO: wire to PATCH /products/edit-product if/when available.
+    // TODO: wire to PATCH backend if needed (optimistic update)
     setProducts((prev) => prev.map((p) => (p.product_id === next.product_id ? next : p)));
-    setSelected(next); // keep modal open with updated data
+    setSelected(next);
   };
 
-  if (loading) {
-    return <div className="pp-container">載入中…</div>;
-  }
-  if (err) {
-    return <div className="pp-container">讀取失敗：{err}</div>;
-  }
+  if (loading) return <div className="pp-container">載入中…</div>;
+  if (err) return <div className="pp-container">讀取失敗：{err}</div>;
 
   return (
     <div className="pp-container">
-      <div className="pp-header">商品管理（來自 API /products/get-all-products）</div>
+      <div className="pp-header">商品管理（圖片以 S3 簽名/Blob URL 顯示）</div>
 
       <div className="pp-toolbar">
         <input
@@ -420,45 +456,67 @@ export default function Settings() {
                     <div className="pp-empty">此分類暫無產品</div>
                   ) : (
                     <div className="pp-grid">
-                      {list.map((p) => (
-                        <article
-                          key={p.product_id}
-                          className="pp-card"
-                          onClick={() => setSelected(p)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => e.key === "Enter" && setSelected(p)}
-                          title="點擊查看與編輯"
-                        >
-                          <div className="pp-thumb">
-                            <img src={p.photos?.[0]} alt={`${p.name} 圖片`} />
-                          </div>
-                          <div className="pp-card-body">
-                            <div className="pp-product-name">{p.name}</div>
-
-                            {Array.isArray(p.photos) && p.photos.length > 1 && (
-                              <div className="pp-mini-thumbs">
-                                {(p.photos.slice(0, 3)).map((src, i) => (
-                                  <img key={src + i} src={src} loading="lazy" alt={`縮圖 ${i + 1}`} />
-                                ))}
-                                {p.photos.length > 3 && <span className="pp-more">+{p.photos.length - 3}</span>}
-                              </div>
-                            )}
-
-                            <div className="pp-price">
-                              {p.salePrice && p.salePrice < p.regularPrice ? (
-                                <>
-                                  <span className="pp-price-sale">{priceTWD(p.salePrice)}</span>
-                                  <span className="pp-price-strike">{priceTWD(p.regularPrice)}</span>
-                                </>
+                      {list.map((p) => {
+                        const photos = getPhotoKeysOrUrls(p);
+                        return (
+                          <article
+                            key={p.product_id}
+                            className="pp-card"
+                            onClick={() => setSelected(p)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => e.key === "Enter" && setSelected(p)}
+                            title="點擊查看與編輯"
+                          >
+                            <div className="pp-thumb">
+                              {photos[0] ? (
+                                <S3Image
+                                  keyOrUrl={photos[0]}
+                                  alt={`${p.name} 圖片`}
+                                  className="pp-img"
+                                  preferBlob={true}
+                                  imgProps={{ loading: "lazy" }}
+                                />
                               ) : (
-                                <span>{priceTWD(p.regularPrice)}</span>
+                                <img src={PLACEHOLDER} alt="placeholder" />
                               )}
                             </div>
-                          </div>
 
-                        </article>
-                      ))}
+                            <div className="pp-card-body">
+                              <div className="pp-product-name">{p.name}</div>
+
+                              {photos.length > 1 && (
+                                <div className="pp-mini-thumbs">
+                                  {photos.slice(0, 3).map((src, i) => (
+                                    <S3Image
+                                      key={src + i}
+                                      keyOrUrl={src}
+                                      alt={`縮圖 ${i + 1}`}
+                                      className="pp-mini"
+                                      preferBlob={false}
+                                      imgProps={{ loading: "lazy" }}
+                                    />
+                                  ))}
+                                  {photos.length > 3 && (
+                                    <span className="pp-more">+{photos.length - 3}</span>
+                                  )}
+                                </div>
+                              )}
+
+                              <div className="pp-price">
+                                {p.salePrice && p.salePrice < p.regularPrice ? (
+                                  <>
+                                    <span className="pp-price-sale">{priceTWD(p.salePrice)}</span>
+                                    <span className="pp-price-strike">{priceTWD(p.regularPrice)}</span>
+                                  </>
+                                ) : (
+                                  <span>{priceTWD(p.regularPrice)}</span>
+                                )}
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
